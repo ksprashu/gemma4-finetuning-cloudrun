@@ -1600,7 +1600,7 @@ Ensure diverse realistic chat snippets with conversational natural flow, typos, 
             });
 
             // Set terminal text with typing simulation or direct swap
-            contentArea.innerHTML = `<pre style="background: none !important; padding: 0 !important; margin: 0 !important;"><code style="color: var(--terminal-text) !important;">\${tracebacks[index].terminal}</code></pre>`;
+            contentArea.innerHTML = `<pre style="background: none !important; padding: 0 !important; margin: 0 !important;"><code style="color: var(--terminal-text) !important;">${tracebacks[index].terminal}</code></pre>`;
         }
 
         // Quiz checking
@@ -1666,7 +1666,7 @@ Ensure diverse realistic chat snippets with conversational natural flow, typos, 
 
             // Update top bar breadcrumbs
             const label = element.querySelector('span').innerText;
-            document.getElementById('top-breadcrumbs').innerText = `Gemma 4 Fine-Tuning & Serving Encyclopedia > \${label}`;
+            document.getElementById('top-breadcrumbs').innerText = `Gemma 4 Fine-Tuning & Serving Encyclopedia > ${label}`;
         }
 
         // Code block copier
