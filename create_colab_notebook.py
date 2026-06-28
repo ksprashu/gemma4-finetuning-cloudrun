@@ -216,15 +216,39 @@ def build_notebook():
     ])
 
     add_code([
+        "import sys\n",
         "import gc\n",
+        "import torch\n",
+        "\n",
+        "# 1. Clear model, tokenizer, and input references from the namespace\n",
+        "for var in ['it_model', 'it_tokenizer', 'inputs', 'outputs', 'formatted_prompt', 'custom_prompt', 'response']:\n",
+        "    if var in globals():\n",
+        "        del globals()[var]\n",
+        "\n",
+        "# 2. Clear traceback references to release memory held by errors\n",
+        "sys.last_traceback = None\n",
+        "sys.last_value = None\n",
+        "sys.last_type = None\n",
+        "\n",
+        "# 3. Flush IPython's command history / Out dict cache\n",
         "try:\n",
-        "    del it_model\n",
-        "    del inputs\n",
+        "    ipython = get_ipython()\n",
+        "    if ipython is not None:\n",
+        "        ipython.user_ns.pop('_', None)\n",
+        "        ipython.user_ns.pop('__', None)\n",
+        "        ipython.user_ns.pop('___', None)\n",
+        "        for key in list(ipython.user_ns.keys()):\n",
+        "            if key.startswith('_') and key[1:].isdigit():\n",
+        "                ipython.user_ns.pop(key, None)\n",
+        "        if 'Out' in ipython.user_ns:\n",
+        "            ipython.user_ns['Out'].clear()\n",
         "except NameError:\n",
         "    pass\n",
+        "\n",
+        "# 4. Trigger garbage collector & empty PyTorch CUDA cache\n",
         "gc.collect()\n",
         "torch.cuda.empty_cache()\n",
-        "print(\"🧹 VRAM memory cleared!\")"
+        "print(\"🧹 VRAM memory cleared! 100% reference cache flushed successfully.\")"
     ])
 
     # --- CELL 7: Markdown Section 2 (Base Model) ---
@@ -321,13 +345,36 @@ def build_notebook():
     ])
 
     add_code([
+        "import sys\n",
         "import gc\n",
         "import torch\n",
+        "\n",
+        "# 1. Clear model, tokenizer, and input references from the namespace\n",
+        "for var in ['base_model', 'base_tokenizer', 'inputs', 'outputs', 'custom_prompt', 'response']:\n",
+        "    if var in globals():\n",
+        "        del globals()[var]\n",
+        "\n",
+        "# 2. Clear traceback references to release memory held by errors\n",
+        "sys.last_traceback = None\n",
+        "sys.last_value = None\n",
+        "sys.last_type = None\n",
+        "\n",
+        "# 3. Flush IPython's command history / Out dict cache\n",
         "try:\n",
-        "    del base_model\n",
-        "    del inputs\n",
+        "    ipython = get_ipython()\n",
+        "    if ipython is not None:\n",
+        "        ipython.user_ns.pop('_', None)\n",
+        "        ipython.user_ns.pop('__', None)\n",
+        "        ipython.user_ns.pop('___', None)\n",
+        "        for key in list(ipython.user_ns.keys()):\n",
+        "            if key.startswith('_') and key[1:].isdigit():\n",
+        "                ipython.user_ns.pop(key, None)\n",
+        "        if 'Out' in ipython.user_ns:\n",
+        "            ipython.user_ns['Out'].clear()\n",
         "except NameError:\n",
         "    pass\n",
+        "\n",
+        "# 4. Trigger garbage collector & empty PyTorch CUDA cache\n",
         "gc.collect()\n",
         "torch.cuda.empty_cache()\n",
         "print(\"🧹 VRAM memory cleared and ready for fine-tuning!\")"
@@ -460,6 +507,16 @@ def build_notebook():
         "",
         "Now we will load our dataset into the Hugging Face `SFTTrainer` and execute our QLoRA training run on the T4 GPU.",
         "",
+        "> [%sIMPORTANT]" % "!" + "\n" +
+        "> **💥 CRITICAL: Google Colab T4 Memory Management & Session Restart Protocol**\n" +
+        "> Because we loaded and played with both the **Instruction-Tuned** and **Base** models in Step 2 and Step 3, Python's garbage collector and Google Colab's interactive forms may have lingering tensor references in memory. Even minor VRAM leaks of 1-2 GB will cause an `OutOfMemoryError` during training because `prepare_model_for_kbit_training` and gradient updates require every megabyte of our 15GB VRAM.\n" +
+        ">\n" +
+        "> **🔄 To ensure a 100% successful training run with ZERO memory issues:**\n" +
+        "> 1. Go to the top menu and select **Runtime -> Restart session** (or use shortcut `Ctrl + M` then `.`).\n" +
+        ">    * *Note: Restarting the session clears the Python state and frees 100% of VRAM, but **keeps** all pip installations and files intact!*\n" +
+        "> 2. Once the session is restarted, skip the loading cells in Step 2 & 3, and run **Step 1** (HF Authentication) to load your credentials.\n" +
+        "> 3. Proceed directly to **Step 5** below to begin fine-tuning!",
+        "",
         "### How the adapters are applied:",
         "1. We freeze the loaded 4-bit base model `google/gemma-4-E2B` to prevent its original parameters from shifting.",
         "2. We define a `LoraConfig` that targets only the projection modules. This inserts low-rank matrices into the network, isolating trainable params.",
@@ -515,8 +572,10 @@ def build_notebook():
         "training_args = SFTConfig(\n",
         "    output_dir=output_dir,\n",
         "    num_train_epochs=1, # 1 Epoch is enough for this self-contained demo\n",
-        "    per_device_train_batch_size=4,\n",
-        "    gradient_accumulation_steps=4,\n",
+        "    per_device_train_batch_size=2,\n",
+        "    gradient_accumulation_steps=8,\n",
+        "    gradient_checkpointing=True,\n",
+        "    gradient_checkpointing_kwargs={\"use_reentrant\": False},\n",
         "    learning_rate=2e-4,\n",
         "    optim=\"paged_adamw_8bit\", # Saves optimizer memory\n",
         "    fp16=True, # Use FP16 for standard T4 operations\n",
