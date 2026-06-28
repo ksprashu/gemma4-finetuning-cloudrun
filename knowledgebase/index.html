@@ -293,7 +293,7 @@
 
         /* Typographic and Structural Articles */
         article {
-            max-width: 860px;
+            max-width: 1050px;
             margin-bottom: 5rem;
             scroll-margin-top: 4rem;
         }
@@ -446,11 +446,15 @@
             margin: 1.5rem 0 !important;
             overflow-x: auto;
             position: relative;
+            white-space: pre-wrap !important;
+            word-break: break-word !important;
         }
 
         code {
             font-family: 'JetBrains Mono', monospace !important;
             font-size: 0.875rem !important;
+            white-space: pre-wrap !important;
+            word-break: break-word !important;
         }
 
         .code-header {
@@ -844,43 +848,43 @@
             <div class="nav-section-title">Manual Chapters</div>
             <ul class="nav-menu" id="nav-list">
                 <li>
-                    <a href="#introduction" class="nav-item active" onclick="setActiveNav(this)">
+                    <a href="#introduction" class="nav-item active" onclick="setActiveNav(event, this)">
                         <span>Cover &amp; Introduction</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
                 <li>
-                    <a href="#chapter1" class="nav-item" onclick="setActiveNav(this)">
+                    <a href="#chapter1" class="nav-item" onclick="setActiveNav(event, this)">
                         <span>1. Inference Engines</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
                 <li>
-                    <a href="#chapter2" class="nav-item" onclick="setActiveNav(this)">
+                    <a href="#chapter2" class="nav-item" onclick="setActiveNav(event, this)">
                         <span>2. Quantisation Formats</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
                 <li>
-                    <a href="#chapter3" class="nav-item" onclick="setActiveNav(this)">
+                    <a href="#chapter3" class="nav-item" onclick="setActiveNav(event, this)">
                         <span>3. Fine-Tuning &amp; PEFT</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
                 <li>
-                    <a href="#chapter4" class="nav-item" onclick="setActiveNav(this)">
+                    <a href="#chapter4" class="nav-item" onclick="setActiveNav(event, this)">
                         <span>4. Robust Evaluation</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
                 <li>
-                    <a href="#chapter5" class="nav-item" onclick="setActiveNav(this)">
+                    <a href="#chapter5" class="nav-item" onclick="setActiveNav(event, this)">
                         <span>5. Our Pipeline Lessons</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
                 <li>
-                    <a href="#chapter6" class="nav-item" onclick="setActiveNav(this)">
+                    <a href="#chapter6" class="nav-item" onclick="setActiveNav(event, this)">
                         <span>6. Agentic Dataset Prep</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
@@ -890,7 +894,7 @@
             <div class="nav-section-title">Diagnostics</div>
             <ul class="nav-menu">
                 <li>
-                    <a href="#troubleshooter" class="nav-item" onclick="setActiveNav(this)">
+                    <a href="#troubleshooter" class="nav-item" onclick="setActiveNav(event, this)">
                         <span>Troubleshooting Hub</span>
                     </a>
                 </li>
@@ -1517,23 +1521,56 @@ Ensure diverse realistic chat snippets with conversational natural flow, typos, 
         const tracebacks = [
             {
                 title: "SFTConfig Run Name Crash",
-                terminal: `[root@Gemma4-train] # python3 train.py\\n\\nValueError: run_name 'manual' is a reserved system keyword. SFTConfig initialization failed.\\nTraceback (most recent call last):\\n  File "train.py", line 42, in <module>\\n    config = SFTConfig(run_name="manual", ...)\\n\\n[DIAGNOSIS]: Hugging Face SFTConfig restricts custom "manual" strings on experiment logs.\\n[FIX]: Changed run_name config parameter to "none" inside create_colab_notebook.py.`
+                terminal: `[root@Gemma4-train] # python3 train.py
+
+ValueError: run_name 'manual' is a reserved system keyword. SFTConfig initialization failed.
+Traceback (most recent call last):
+  File "train.py", line 42, in <module>
+    config = SFTConfig(run_name="manual", ...)
+
+[DIAGNOSIS]: Hugging Face SFTConfig restricts custom "manual" strings on experiment logs.
+[FIX]: Changed run_name config parameter to "none" inside create_colab_notebook.py.`
             },
             {
                 title: "Missing AutoModel NameError",
-                terminal: `[root@Gemma4-train] # python3 step3_load.py\\n\\nNameError: name 'AutoModelForCausalLM' is not defined\\nTraceback (most recent call last):\\n  File "step3_load.py", line 18, in <module>\\n    model = AutoModelForCausalLM.from_pretrained(...)\\n\\n[DIAGNOSIS]: Stateless Colab environment kernel timeouts lose previous cell declarations.\\n[FIX]: Wrapped explicit, redundant PyTorch and Transformers imports inside Step 3.`
+                terminal: `[root@Gemma4-train] # python3 step3_load.py
+
+NameError: name 'AutoModelForCausalLM' is not defined
+Traceback (most recent call last):
+  File "step3_load.py", line 18, in <module>
+    model = AutoModelForCausalLM.from_pretrained(...)
+
+[DIAGNOSIS]: Stateless Colab environment kernel timeouts lose previous cell declarations.
+[FIX]: Wrapped explicit, redundant PyTorch and Transformers imports inside Step 3.`
             },
             {
                 title: "T4 GPU VRAM OOM / Precision Fallback",
-                terminal: `[root@Gemma4-train] # python3 train.py\\n\\nPyTorch Runtime Exception: CUDA Out of Memory. Tried to allocate 8.75 GiB (GPU 0; 15.00 GiB total capacity; 11.20 GiB already allocated).\\n[OR]\\nRuntimeError: bfloat16 is not natively supported on NVIDIA T4 (Turing) architectures.\\n\\n[DIAGNOSIS]: HF prepare_model_for_kbit_training upcasts all embed layers, bloating Gemma 256K vocabulary memory by 8.75 GiB. SFTConfig bf16=True fails on T4.\\n[FIX]: Developed custom_prepare_model_for_kbit_training upcasting ONLY layer norms, saving 8GB VRAM.`
+                terminal: `[root@Gemma4-train] # python3 train.py
+
+PyTorch Runtime Exception: CUDA Out of Memory. Tried to allocate 8.75 GiB (GPU 0; 15.00 GiB total capacity; 11.20 GiB already allocated).
+[OR]
+RuntimeError: bfloat16 is not natively supported on NVIDIA T4 (Turing) architectures.
+
+[DIAGNOSIS]: HF prepare_model_for_kbit_training upcasts all embed layers, bloating Gemma 256K vocabulary memory by 8.75 GiB. SFTConfig bf16=True fails on T4.
+[FIX]: Developed custom_prepare_model_for_kbit_training upcasting ONLY layer norms, saving 8GB VRAM.`
             },
             {
                 title: "Token Leaking",
-                terminal: `[root@Gemma4-serve] # curl -X POST localhost:8080/generate -d '{"prompt": "Classify sentiment: Great!"}'\\n\\n"Output": "Positive<end_of_turn>\\\\n<"\\n\\n[DIAGNOSIS]: Gemma 4 conversational stop logits leak raw template symbols on short generation targets.\\n[FIX]: Implemented clean_prediction splits splitting outputs on first '<' char and stripping whitespaces.`
+                terminal: `[root@Gemma4-serve] # curl -X POST localhost:8080/generate -d '{"prompt": "Classify sentiment: Great!"}'
+
+"Output": "Positive<end_of_turn>\n<"
+
+[DIAGNOSIS]: Gemma 4 conversational stop logits leak raw template symbols on short generation targets.
+[FIX]: Implemented clean_prediction splits splitting outputs on first '<' char and stripping whitespaces.`
             },
             {
                 title: "GCS Serialization",
-                terminal: `[root@Gemma4-serve] # python3 serve.py\\n\\nFileNotFoundError: [Errno 2] No such file or directory: 'adapter_config.json' inside ephemeral container storage.\\n\\n[DIAGNOSIS]: Cloud Run instances are volatile; local file caches erase on container reboots.\\n[FIX]: Configured google-cloud-storage direct uploads on train completion and pulled adapters dynamically on FastAPI boot.`
+                terminal: `[root@Gemma4-serve] # python3 serve.py
+
+FileNotFoundError: [Errno 2] No such file or directory: 'adapter_config.json' inside ephemeral container storage.
+
+[DIAGNOSIS]: Cloud Run instances are volatile; local file caches erase on container reboots.
+[FIX]: Configured google-cloud-storage direct uploads on train completion and pulled adapters dynamically on FastAPI boot.`
             }
         ];
 
@@ -1600,7 +1637,7 @@ Ensure diverse realistic chat snippets with conversational natural flow, typos, 
             });
 
             // Set terminal text with typing simulation or direct swap
-            contentArea.innerHTML = `<pre style="background: none !important; padding: 0 !important; margin: 0 !important;"><code style="color: var(--terminal-text) !important;">${tracebacks[index].terminal}</code></pre>`;
+            contentArea.innerHTML = `<pre style="background: none !important; padding: 0 !important; margin: 0 !important; white-space: pre-wrap !important; word-break: break-word !important;"><code style="color: var(--terminal-text) !important; white-space: pre-wrap !important; word-break: break-word !important;">${tracebacks[index].terminal}</code></pre>`;
         }
 
         // Quiz checking
@@ -1659,7 +1696,8 @@ Ensure diverse realistic chat snippets with conversational natural flow, typos, 
         }
 
         // Active Navigation Highlighter
-        function setActiveNav(element) {
+        function setActiveNav(event, element) {
+            if (event) event.preventDefault();
             const items = document.querySelectorAll('.nav-item');
             items.forEach(item => item.classList.remove('active'));
             element.classList.add('active');
@@ -1667,6 +1705,17 @@ Ensure diverse realistic chat snippets with conversational natural flow, typos, 
             // Update top bar breadcrumbs
             const label = element.querySelector('span').innerText;
             document.getElementById('top-breadcrumbs').innerText = `Gemma 4 Fine-Tuning & Serving Encyclopedia > ${label}`;
+
+            const targetId = element.getAttribute('href');
+            const targetElement = document.querySelector(targetId);
+            const mainElement = document.querySelector('main');
+            if (targetElement && mainElement) {
+                const targetOffsetTop = targetElement.getBoundingClientRect().top + mainElement.scrollTop - mainElement.getBoundingClientRect().top;
+                mainElement.scrollTo({
+                    top: targetOffsetTop,
+                    behavior: 'smooth'
+                });
+            }
         }
 
         // Code block copier
