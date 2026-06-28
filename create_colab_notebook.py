@@ -604,7 +604,7 @@ def build_notebook():
         "    bf16=False,\n",
         "    logging_steps=10,\n",
         "    save_strategy=\"no\",\n",
-        "    max_seq_length=512,\n",
+        "    max_length=512,\n",
         "    report_to=\"none\"\n",
         ")\n",
         "\n",

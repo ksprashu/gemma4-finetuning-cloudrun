@@ -210,7 +210,7 @@ def main():
         fp16=False,
         bf16=True, # Recommended for L4 GPU
         optim="paged_adamw_8bit", # Memory-efficient optimizer for QLoRA
-        max_seq_length=args.max_seq_length,
+        max_length=args.max_seq_length,
         report_to="none", # Avoid requiring wandb/tensorboard logins
         dataset_text_field="text" if "text" in dataset.column_names else None,
         packing=False, # Set True if dataset contains short text fields to speed up
