@@ -2,6 +2,16 @@
 
 This repository contains a production-grade, end-to-end framework for fine-tuning and serving Google's **Gemma 4 (Edge 4B)** model on **Google Cloud Run** using NVIDIA L4 GPUs.
 
+## 📋 End-to-End Pipeline Overview
+
+This production pipeline consists of 6 integrated stages to run serverless fine-tuning and serving:
+1. **Dataset Synthesis & Upload**: Generate nuanced training data programmatically (using template scripts) or agentically (using Google Antigravity) and upload to Google Cloud Storage (GCS).
+2. **Secrets & Container Image Setup**: Securely store Hugging Face access credentials and build/push Docker containers for training and serving to Google Artifact Registry.
+3. **Fine-Tuning on Serverless GPUs**: Launch a Cloud Run Job to train Gemma 4 with QLoRA on a high-performance NVIDIA L4 GPU.
+4. **Adapter GCS Serialization**: Persist lightweight adapter weights ($\sim10\text{-}20\text{MB}$) to a GCS bucket, bypassing ephemeral VM data loss.
+5. **Serverless Production Serving**: Deploy a Cloud Run Service that dynamically downloads and merges the GCS adapter onto the quantized base model on startup, serving OpenAI-compatible API endpoints.
+6. **Inference Verification**: Run test queries using Python client scripts or raw `curl` commands against the deployed service.
+
 ---
 
 ## 🏗️ Project Architecture & Components
@@ -25,6 +35,8 @@ This repository contains a production-grade, end-to-end framework for fine-tunin
 ---
 
 ## 🔄 End-to-End Data Flow
+
+![Gemma Fine-Tuning Workflow](gemma_finetuning_workflow.png)
 
 ```mermaid
 flowchart TD

@@ -51,6 +51,11 @@ def build_notebook():
         "1. **`google/gemma-4-E2B` (Base Model)**: Pre-trained on a massive corpus. It excels at autocompleting text but doesn't understand conversational instruction formats.",
         "2. **`google/gemma-4-E2B-it` (Instruction-Tuned Model)**: Fine-tuned by Google to follow conversational formatting, reply to user prompts, and act as an interactive assistant.",
         "",
+        "### 🔓 Closed API-only Models vs. 🌌 Open-Weights Models",
+        "When developing LLM-powered applications, developers choose between two paradigms:",
+        "- **Closed API-only Models (e.g., Gemini API, GPT-4)**: These are black-box services hosted on third-party servers. They are charged on a strict per-token basis, present substantial data privacy/compliance challenges (since proprietary data must cross trust boundaries), and risk service disruptions or model deprecation. Most importantly, you cannot view, modify, or export the underlying neural weights.",
+        "- **Open-Weights Models (e.g., Gemma 4)**: These models publish their complete model architecture and parameter weights, giving you 100% ownership and control. You can run them completely offline, host them on your own serverless infrastructure, ensure total data privacy, and modify the internal weight tensors via fine-tuning to perform specialized domain tasks with flawless reliability.",
+        "",
         "### 🎭 Model Behavioral Comparison Matrix",
         "This matrix displays the exact behavior expected from each model variant given the **exact same prompt**:",
         "",
@@ -60,10 +65,26 @@ def build_notebook():
         "| **Base Model**<br>`google/gemma-4-E2B` | **Raw Statistical Autocomplete**<br>Ignores the command and treats the prompt as the start of a document, continuing to list reviews or templates. | `Classify the sentiment: 'The software has a steep learning curve, but it is absolutely brilliant!'`<br>`Classify the sentiment: 'Bad battery.'`<br>`Classify the sentiment: 'Excellent stay.'` | It acts as a **high-entropy token completer**. It only knows how to continue the statistical pattern of the input text, not how to follow an instruction. |",
         "| **Fine-Tuned Model**<br>`Base Model + Sentiment Adapter` | **Domain Aligned Specialist**<br>Constrains its high-entropy autocomplete states to output *only* your target sentiment label. | `Positive` | QLoRA backpropagation updated the adapter's linear projection layers, steering attention heads to emit only the targeted classification tokens when prompted with the instruction template. |",
         "",
-        "### ⚡ QLoRA: Fine-Tuning 2B parameters on a T4 GPU",
-        "- **4-bit Quantization**: We load the base model in 4-bit precision (NF4), reducing the base memory footprint to **~1.5GB to 2.0GB VRAM**.",
-        "- **LoRA Adapters**: Instead of updating all 2B parameters, we freeze the base model and train small, lightweight matrices (adapters) attached to the target layers (`q_proj`, `v_proj`, etc.).",
-        "- **Paged 8-bit Optimizers**: We use `paged_adamw_8bit` which offloads optimizer memory states to system RAM during training peaks.",
+        "### 🧬 Parameter-Efficient Fine-Tuning (PEFT) & LoRA",
+        "Fine-tuning a modern LLM traditionally required updating every single one of its millions or billions of weights. For a 2-billion parameter model like Gemma 4, full-parameter training is incredibly expensive and demands massive GPU clusters to fit the model weights, gradients, and optimizer states in memory.",
+        "",
+        "**Low-Rank Adaptation (LoRA)** is a highly effective Parameter-Efficient Fine-Tuning (PEFT) method that resolves this. During training, LoRA freezes the original pre-trained weight matrices ($W_0 \\in \\mathbb{R}^{d \\times k}$) and updates only a highly compressed, low-rank representation of the changes.",
+        "",
+        "Instead of directly learning a full weight update matrix $\\Delta W \\in \\mathbb{R}^{d \\times k}$, LoRA decomposes it into the product of two extremely skinny, low-rank matrices $A \\in \\mathbb{R}^{d \\times r}$ and $B \\in \\mathbb{R}^{r \\times k}$:",
+        "$$\\Delta W = A \\times B$$",
+        "where $r$ is the **rank** (e.g., $r = 8$ or $r = 16$), representing a fraction of the original dimensions ($r \\ll \\min(d, k)$).",
+        "",
+        "- **Conceptual Example:** Consider a single projection layer where input and output dimensions $d = 2048$ and $k = 2048$.",
+        "  - *Full Parameter Fine-Tuning* requires updating and saving $\\Delta W$, which has $2048 \\times 2048 = 4,194,304$ trainable parameters.",
+        "  - *LoRA Fine-Tuning (with Rank $r=16$)* trains matrix $A$ ($2048 \\times 16$) and matrix $B$ ($16 \\times 2048$), totaling $(2048 \\times 16) + (16 \\times 2048) = 65,536$ parameters.",
+        "  - This represents an outstanding **98.44% reduction in trainable parameters** for that layer! Across the entire model, LoRA reduces trainable parameters by **99%+**, making fine-tuning exceptionally fast and memory-efficient.",
+        "",
+        "### 💾 4-bit Quantization & NormalFloat4 (NF4)",
+        "Even with LoRA, loading a 2B parameter model in standard 16-bit precision requires over **4 Gigabytes of VRAM** just to hold the model in GPU memory, which leaves little to no headroom for the batch data, activation maps, and optimization overhead on standard GPUs.",
+        "",
+        "**QLoRA (Quantized Low-Rank Adaptation)** introduces a major breakthrough by compressing the frozen base model down to 4-bit precision using a specialized format called **NormalFloat 4 (NF4)**:",
+        "- **NormalFloat 4 (NF4)**: Standard integer quantization (like INT4) uses equally spaced intervals, which performs poorly on neural network weights because weight matrices almost always follow a zero-centered normal distribution. NF4 is an information-theoretically optimal quantile quantization format. It constructs quantization bins such that each of the 16 available 4-bit symbols has an equal expected probability of occurrence, maximizing information density and keeping model accuracy remarkably high despite 4-bit compression.",
+        "- **VRAM Footprint Reduction**: Quantizing Gemma 4 E2B to NF4 reduces the VRAM footprint from **4GB down to just ~1.5GB VRAM**. This frees up over **14GB of VRAM** on a standard free-tier NVIDIA T4 GPU (which has 16GB total), leaving massive headroom for high-throughput training batches, gradient storage, and paged optimizers (`paged_adamw_8bit`).",
         "",
         "This notebook is **100% self-contained** and can be run end-to-end on Colab's free tier!",
         "",
@@ -700,25 +721,68 @@ def build_notebook():
         "print(f\"💾 Fine-tuned adapter saved locally to '{adapter_dir}'\")"
     ])
 
-    # --- CELL 12.5: Google Drive Saving Markdown ---
+    # --- CELL 12.5: Consolidated Step 5.5 Markdown (Pedagogy & Visual Workflow) ---
     add_markdown([
-        "## 💾 Step 5.5: Saving & Restoring Adapter Weights (Google Drive Integration)",
+        "## 💾 Step 5.5: Ephemerality Protection – Saving, Exporting, and Restoring Your Fine-Tuned Adapter",
         "",
-        "Because Google Colab's default local directory is **ephemeral**, any files saved there (like `./fine_tuned_gemma_adapter`) will be **lost completely** if the notebook runtime disconnects, resets, or if you restart your session.",
+        "Congratulations! You have successfully fine-tuned the raw Base Model into a specialized Sentiment Classifier. However, we have a critical challenge to address: **ephemerality**.",
         "",
-        "To make your hard work permanent and resilient, you can mount your personal **Google Drive** and save the adapter there. When you open this notebook in a fresh session next time, you can simply mount Google Drive and load your pre-trained adapter in **2 seconds flat**—completely bypassing the 5-minute training phase!",
+        "### ⚠️ The Reality of Colab VM Ephemerality",
+        "Google Colab operates on an **ephemeral containerized model**. When you start a notebook, you are leased a temporary virtual machine (VM) backed by a cloud GPU. However, this lease is highly volatile and completely non-persistent:",
+        "- **Inactivity Timeouts**: If you do not interact with the notebook for a short period, Colab automatically disconnects your session.",
+        "- **Browser/Tab Closure**: Closing your browser tab or experiencing a brief internet outage can trigger container termination.",
+        "- **Lease Expirations**: Free-tier sessions have hard time limits (usually 12 hours max) after which the VM is forcefully reclaimed.",
+        "- **Runtime Restarts**: Changing runtime types, GPU allocations, or experiencing memory crashes instantly reboots the kernel.",
         "",
-        "### 📂 Option A: Save fine-tuned adapter to Google Drive"
+        "**When any of these events occur, the virtual hard drive of your Colab container is instantly and permanently wiped clean.** Any files stored under `/content/` or `./fine_tuned_gemma_adapter` are deleted forever. To protect your investment in training time and compute, you MUST persist your weights to an external, durable storage provider immediately.",
+        "",
+        "### 🌌 The Power of Portable Adapters: 15MB vs. 10GB",
+        "Fortunately, because we utilized **QLoRA (Quantized Low-Rank Adaptation)**, we did not alter the original pre-trained base model weights. Instead, we only trained small, auxiliary low-rank matrices. This architectural separation yields a staggering difference in portability:",
+        "",
+        "| Characteristic | Frozen Base Model | QLoRA Sentiment Adapter |",
+        "| :--- | :--- | :--- |",
+        "| **Parameter Count** | ~2,000,000,000 (2 Billion) | ~13,000,000 (13 Million) |",
+        "| **File Size on Disk** | **~10.2 GB** (Gigabytes) | **~15 MB** (Megabytes) |",
+        "| **Transfer/Save Time** | Extremely slow (~5-15 mins over network) | Instantaneous (~1-2 seconds) |",
+        "| **Storage Cost** | High (Requires premium cloud space) | Virtually Free |",
+        "| **Storage Destination**| Hugging Face Cache (Read-only) | GCS, Hugging Face, GDrive, Local |",
+        "",
+        "### 🗺️ The Fine-Tuning and Saving Lifecycle",
+        "The following engineering diagram illustrates how our frozen base model combines with trainable adapter layers during training, and how we can persist these tiny weights permanently and restore them in subsequent sessions in **2 seconds flat**—completely bypassing retraining!",
+        "",
+        "| Model Variant | Expected Behavior | Example Output |",
+        "| :--- | :--- | :--- |",
+        "| **Instruction-Tuned (IT)** | **Task Aligned Helper** | `Positive` |",
+        "",
+        "![Gemma 4 Fine-Tuning and Saving Workflow](gemma_finetuning_workflow.png)",
+        "",
+        "### ⚡ Dynamic 2-Second Restoration in Fresh Sessions",
+        "This incredible difference in size is what makes open-weights edge models so powerful in production. Because the base model `google/gemma-4-E2B` is standardized and publicly hosted on Hugging Face, you do not need to download or back up its massive 10GB weights. You only need to save your tiny **15MB adapter folder**.",
+        "",
+        "In any fresh session in the future, you can simply load the raw base model dynamically in 4-bit, and then download and overlay your custom 15MB adapter on top of it. The PEFT library merges these weights at runtime in **less than 2 seconds**, giving you a fully restored, domain-aligned specialist model without ever having to re-run the fine-tuning process!",
+        "",
+        "Because our adapter is so lightweight, we can easily back it up using multiple methods. Below, you will find four optional ways to save your adapter (Part A), and a unified restoration block to reload them on a fresh runtime (Part B)."
     ])
 
-    # --- CELL 12.6: Google Drive Saving Block ---
+    # --- CELL 12.5.1: Part A Header ---
+    add_markdown([
+        "### 📂 Part A: Save & Export Your Adapter (Choose One)",
+        "Choose **one** of the four options below to save your fine-tuned weights permanently. You do not need to run all of them."
+    ])
+
+    # --- CELL 12.6: Option 1 (Google Drive Save) ---
+    add_markdown([
+        "#### 📁 Option 1: Backup directly to your personal Google Drive",
+        "This is the easiest and most convenient option. It mounts your Google Drive as a local folder and copies the adapter directory directly to your `MyDrive` space."
+    ])
     add_code([
+        "#@title 📁 Option 1: Save Adapter to Google Drive { run: \"none\" }\n",
         "import shutil\n",
         "import os\n",
         "\n",
         "try:\n",
         "    from google.colab import drive\n",
-        "    print(\"⏳ Mounting Google Drive to save adapter permanently...\")\n",
+        "    print(\"⏳ Mounting Google Drive...\")\n",
         "    drive.mount('/content/drive')\n",
         "    \n",
         "    gdrive_adapter_path = \"/content/drive/MyDrive/fine_tuned_gemma_adapter\"\n",
@@ -733,20 +797,119 @@ def build_notebook():
         "    print(f\"❌ Failed to save to Google Drive (make sure to grant permissions): {e}\")"
     ])
 
-    # --- CELL 12.7: Loading Markdown ---
+    # --- CELL 12.6.2: Option 2 (Hugging Face Hub Push) ---
     add_markdown([
-        "### 🔄 Option B: Restore/Load an existing adapter (Bypass Retraining!)",
-        "",
-        "If you have already trained your model and saved your adapter to Google Drive, or if you pushed it to the Hugging Face Hub, you do **not** need to run Step 5 (the training loop) again!",
-        "",
-        "Run Step 1, Step 3 (to load the base model), and then use this interactive cell below to load your adapter directly. This will instantly configure your model for inference!"
+        "#### 🤗 Option 2: Share and Push to the Hugging Face Hub (Highly Recommended)",
+        "This is the industry-standard way to save model weights. Pushing your adapter to Hugging Face creates a repository (which can be **public** or **private**) from which you or anyone else can load the weights in a single line of code! (Make sure you logged in with a **WRITE** token in Step 1)."
+    ])
+    add_code([
+        "#@title 🤗 Option 2: Push Adapter to Hugging Face Hub { run: \"none\" }\n",
+        "#@markdown Enter your Hugging Face username and desired repository name below.\n",
+        "HF_USERNAME = \"your_hf_username\" #@param {type:\"string\"}\n",
+        "HF_REPO_NAME = \"gemma-4-sentiment-adapter\" #@param {type:\"string\"}\n",
+        "MAKE_PRIVATE = True #@param {type:\"boolean\"}\n",
+        "\n",
+        "hub_model_id = f\"{HF_USERNAME}/{HF_REPO_NAME}\"\n",
+        "\n",
+        "if HF_USERNAME == \"your_hf_username\":\n",
+        "    print(\"⚠️ Please enter your real Hugging Face username in the form-field above!\")\n",
+        "else:\n",
+        "    print(f\"⏳ Pushing adapter weights and tokenizer to Hugging Face Hub: {hub_model_id}...\")\n",
+        "    try:\n",
+        "        # Push the PEFT adapter model and base tokenizer\n",
+        "        trainer.model.push_to_hub(hub_model_id, private=MAKE_PRIVATE)\n",
+        "        base_tokenizer.push_to_hub(hub_model_id, private=MAKE_PRIVATE)\n",
+        "        print(f\"\\n🎉 Successfully pushed to HF Hub! View it at: https://huggingface.co/{hub_model_id}\")\n",
+        "        print(\"\\n💡 Others can load and use your adapter directly using:\")\n",
+        "        print(f\"   PeftModel.from_pretrained(base_model, \\\"{hub_model_id}\\\")\")\n",
+        "    except Exception as e:\n",
+        "        print(f\"\\n❌ Push failed: {e}\")\n",
+        "        print(\"💡 Did you use a token with WRITE permissions during login in Step 1?\")"
     ])
 
-    # --- CELL 12.8: Loading Block ---
+    # --- CELL 12.6.3: Option 3 (Google Cloud Storage Upload) ---
+    add_markdown([
+        "#### ☁️ Option 3: Export to Google Cloud Storage (GCS) (Production & Cloud Run Integration)",
+        "This option uploads your adapter directly to a Google Cloud Storage bucket. This is ideal if you want to integrate this adapter with our production deployment workflow, where your Cloud Run serving service downloads the weights dynamically during startup."
+    ])
     add_code([
-        "#@title 🔄 Restore Adapter weights { run: \"manual\" }\n",
-        "LOAD_SOURCE = \"Google Drive\" #@param [\"Local Directory\", \"Google Drive\", \"Hugging Face Hub\", \"Browser Upload (.zip)\"]\n",
+        "#@title ☁️ Option 3: Upload Adapter to GCS { run: \"none\" }\n",
+        "#@markdown Authenticates your GCP account, creates a bucket, and uploads the folder.\n",
+        "GCP_PROJECT_ID = \"YOUR_GCP_PROJECT_ID\" #@param {type:\"string\"}\n",
+        "GCS_BUCKET_NAME = \"your-gemma-gcp-bucket\" #@param {type:\"string\"}\n",
+        "GCS_DEST_FOLDER = \"gemma-4-adapters/\" #@param {type:\"string\"}\n",
+        "\n",
+        "if GCP_PROJECT_ID == \"YOUR_GCP_PROJECT_ID\":\n",
+        "    print(\"⚠️ Please enter your active GCP Project ID in the form-field above!\")\n",
+        "else:\n",
+        "    try:\n",
+        "        from google.colab import auth\n",
+        "        print(\"⏳ Authenticating Google Cloud account within Colab...\")\n",
+        "        auth.authenticate_user()\n",
+        "        \n",
+        "        # Set active gcloud project\n",
+        "        !gcloud config set project {GCP_PROJECT_ID}\n",
+        "        \n",
+        "        # Create GCS bucket if not exists\n",
+        "        print(f\"⏳ Checking/Creating GCS bucket: gs://{GCS_BUCKET_NAME}...\")\n",
+        "        !gcloud storage buckets create gs://{GCS_BUCKET_NAME} --location=us-central1 || true\n",
+        "        \n",
+        "        # Upload local fine-tuned adapter directory to GCS\n",
+        "        print(f\"⏳ Uploading local adapter files to gs://{GCS_BUCKET_NAME}/{GCS_DEST_FOLDER}...\")\n",
+        "        !gcloud storage cp -r ./fine_tuned_gemma_adapter gs://{GCS_BUCKET_NAME}/{GCS_DEST_FOLDER}\n",
+        "        print(f\"\\n🎉 Successfully uploaded fine-tuned adapter weights to: gs://{GCS_BUCKET_NAME}/{GCS_DEST_FOLDER}\")\n",
+        "    except Exception as e:\n",
+        "        print(f\"❌ GCS upload failed: {e}\")"
+    ])
+
+    # --- CELL 12.6.4: Option 4 (Browser Download Zip) ---
+    add_markdown([
+        "#### 📥 Option 4: Download directly to your local computer (No accounts required)",
+        "If you want to keep a local copy of your fine-tuned weights without setting up cloud buckets or online registries, this block will compress your adapter folder into a `.zip` archive and trigger a direct browser download."
+    ])
+    add_code([
+        "#@title 📥 Option 4: Download Adapter as .zip { run: \"none\" }\n",
+        "import os\n",
+        "import zipfile\n",
+        "from google.colab import files\n",
+        "\n",
+        "zip_path = \"./fine_tuned_gemma_adapter.zip\"\n",
+        "adapter_dir = \"./fine_tuned_gemma_adapter\"\n",
+        "\n",
+        "print(\"⏳ Compressing fine-tuned adapter folder...\")\n",
+        "with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:\n",
+        "    for root, dirs, files_in_dir in os.walk(adapter_dir):\n",
+        "        for file in files_in_dir:\n",
+        "            file_path = os.path.join(root, file)\n",
+        "            # Maintain relative path inside zip\n",
+        "            arcname = os.path.relpath(file_path, os.path.dirname(adapter_dir))\n",
+        "            zipf.write(file_path, arcname)\n",
+        "\n",
+        "print(f\"✅ Compression complete! File size: {os.path.getsize(zip_path) / (1024*1024):.2f} MB\")\n",
+        "print(\"⏳ Starting browser download. Please allow popups if prompted...\")\n",
+        "files.download(zip_path)"
+    ])
+
+    # --- CELL 12.7: Consolidated Restoration Markdown ---
+    add_markdown([
+        "### 🔄 Part B: Restore & Reload Weights (Bypass Retraining!)",
+        "",
+        "If you have already trained your model and saved your adapter using one of the methods above, you **do not need to run Step 5 (the training loop) again!**",
+        "",
+        "When returning to this notebook in a fresh session next time:",
+        "1. Run **Step 1** (to import dependencies).",
+        "2. Run **Step 3** (to load the base model).",
+        "3. Run this interactive form cell below. Select your **LOAD_SOURCE**, configure the variables, and click **Run**. This will pull your weights in seconds and instantly configure your model for inference!"
+    ])
+
+    # --- CELL 12.8: Consolidated Restoration Block ---
+    add_code([
+        "#@title 🔄 Restore Adapter weights { run: \"none\" }\n",
+        "LOAD_SOURCE = \"Google Drive\" #@param [\"Local Directory\", \"Google Drive\", \"Hugging Face Hub\", \"Browser Upload (.zip)\", \"Google Cloud Storage (GCS)\"]\n",
         "HF_MODEL_ID = \"username/gemma-4-sentiment-adapter\" #@param {type:\"string\"}\n",
+        "GCP_PROJECT_ID = \"YOUR_GCP_PROJECT_ID\" #@param {type:\"string\"}\n",
+        "GCS_BUCKET_NAME = \"your-gemma-gcp-bucket\" #@param {type:\"string\"}\n",
+        "GCS_ADAPTER_FOLDER = \"gemma-4-adapters/\" #@param {type:\"string\"}\n",
         "\n",
         "import os\n",
         "import shutil\n",
@@ -767,8 +930,11 @@ def build_notebook():
         "            print(f\"✅ Successfully located adapter in Google Drive: {adapter_path}\")\n",
         "        else:\n",
         "            print(\"⚠️ Warning: Adapter folder not found in Google Drive! Make sure you saved it first.\")\n",
+        "            upload_successful = False\n",
         "    except Exception as e:\n",
         "        print(f\"❌ Failed to mount Google Drive: {e}\")\n",
+        "        upload_successful = False\n",
+        "\n",
         "elif LOAD_SOURCE == \"Browser Upload (.zip)\":\n",
         "    try:\n",
         "        from google.colab import files\n",
@@ -806,11 +972,38 @@ def build_notebook():
         "    except Exception as e:\n",
         "        print(f\"❌ Failed to upload or extract zip: {e}\")\n",
         "        upload_successful = False\n",
+        "\n",
+        "elif LOAD_SOURCE == \"Google Cloud Storage (GCS)\":\n",
+        "    if GCP_PROJECT_ID == \"YOUR_GCP_PROJECT_ID\":\n",
+        "        print(\"⚠️ Please enter your active GCP Project ID in the form-field above!\")\n",
+        "        upload_successful = False\n",
+        "    else:\n",
+        "        try:\n",
+        "            from google.colab import auth\n",
+        "            print(\"⏳ Authenticating GCP Account...\")\n",
+        "            auth.authenticate_user()\n",
+        "            \n",
+        "            # Configure project\n",
+        "            !gcloud config set project {GCP_PROJECT_ID}\n",
+        "            \n",
+        "            # Clean local directory\n",
+        "            if os.path.exists(\"./fine_tuned_gemma_adapter\"):\n",
+        "                shutil.rmtree(\"./fine_tuned_gemma_adapter\")\n",
+        "            os.makedirs(\"./fine_tuned_gemma_adapter\")\n",
+        "            \n",
+        "            # Download adapter weights\n",
+        "            print(f\"⏳ Downloading adapter files from GCS: gs://{GCS_BUCKET_NAME}/{GCS_ADAPTER_FOLDER}...\")\n",
+        "            !gcloud storage cp -r gs://{GCS_BUCKET_NAME}/{GCS_ADAPTER_FOLDER}* ./fine_tuned_gemma_adapter/\n",
+        "            print(\"🎉 SUCCESS! Successfully downloaded and restored adapter weights from GCS!\")\n",
+        "        except Exception as e:\n",
+        "            print(f\"❌ Failed to download from GCS: {e}\")\n",
+        "            upload_successful = False\n",
+        "\n",
         "elif LOAD_SOURCE == \"Hugging Face Hub\":\n",
         "    adapter_path = HF_MODEL_ID\n",
-        "    print(f\"✅ Loading adapter from Hugging Face Hub: {adapter_path}\")\n",
+        "    print(f\"✅ Configured to load adapter from Hugging Face Hub: {adapter_path}\")\n",
         "else:\n",
-        "    print(f\"✅ Loading from local directory: {adapter_path}\")\n",
+        "    print(f\"✅ Configured to load from local directory: {adapter_path}\")\n",
         "\n",
         "if upload_successful:\n",
         "    try:\n",
@@ -834,7 +1027,7 @@ def build_notebook():
         "                trainer.model = trainer_model\n",
         "                \n",
         "            print(\"🎉 SUCCESS! Model successfully wrapped with the pre-trained adapter weights.\")\n",
-        "            print(\"💡 You are now ready to run Step 6 (Evaluation) and Step 7/8 (Exports) directly!\")\n",
+        "            print(\"💡 You are now ready to run Step 6 (Evaluation) directly!\")\n",
         "        else:\n",
         "            print(\"❌ Error: 'base_model' is not loaded in memory. Please run Step 1 and Step 3 first!\")\n",
         "    except Exception as e:\n",
@@ -845,9 +1038,12 @@ def build_notebook():
     add_markdown([
         "## 🔬 Step 6: Evaluating the Fine-Tuned Model",
         "",
-        "Let's test our newly fine-tuned model (which is the frozen base model merged with our newly trained LoRA adapter).",
+        "Now let's test our newly fine-tuned model (which is the frozen base model merged with our newly trained LoRA adapter).",
         "",
-        "Observe the output: the base model, which formerly autocompleted random text, has now successfully aligned to behave as a **sentiment classifier**, outputting the clean sentiment label!"
+        "Observe the output: the base model, which formerly autocompleted random text, has now successfully aligned to behave as a **sentiment classifier**, outputting the clean sentiment label!",
+        "",
+        "### 💡 Under the Hood: What is happening during evaluation?",
+        "When we execute `trainer.model.generate(...)`, Hugging Face's `PeftModel` routes inputs through both our frozen base model and our active LoRA adapter layer. The adapter dynamically adjusts the attention weight computations, shifting the token probability distributions so that high-entropy autocompletions are suppressed, and the exact classification labels (`Positive` or `Negative`) emerge with high probability."
     ])
 
     # --- CELL 14: Executing Fine-Tuned Inference ---
@@ -939,101 +1135,23 @@ def build_notebook():
         "    print(\"⚠️ Error: The Fine-tuned model or trainer is not in memory. Please complete the QLoRA training steps above.\")"
     ])
 
-    # --- CELL 15: Markdown Section 6 (GCS Integration) ---
+    # --- CELL 15: Markdown Section 6 (Next Steps / Cloud Run Deployment Overview) ---
     add_markdown([
-        "## ☁️ Step 7: Saving and Exporting Checkpoints to Google Cloud Storage (GCS)",
+        "## 🚀 Next Steps: Serving Your Fine-Tuned Model in Production",
         "",
-        "To save these adapters permanently (since Colab local memory is ephemeral), you can easily serialize them and upload them directly to a Google Cloud Storage bucket. This allows your Cloud Run service to download them dynamically during deployment.",
+        "Congratulations! You have completed the entire open-weights fine-tuning pipeline. Let's summarize what we have accomplished:",
+        "1. **Compared Behaviors:** Understood why base models differ from instruction-tuned models.",
+        "2. **Loaded the base model in 4-bit:** Reduced memory consumption to run comfortably on a standard GPU.",
+        "3. **SFT Data Processing:** Loaded and prepared our sentiment reviews using Chat Templates.",
+        "4. **Fine-tuned with QLoRA:** Trained tiny, extremely targeted adapters to steer the model's behavior.",
+        "5. **Created Ephemerality Backups:** Saved our adapter weights permanently.",
         "",
-        "### GCS Integration Commands"
-    ])
-
-    add_code([
-        "# 1. Authenticate your Google Cloud account within Colab\n",
-        "from google.colab import auth\n",
-        "auth.authenticate_user()\n",
-        "print(\"✅ Authenticated GCP User!\")\n",
-        "\n",
-        "# 2. Configure project variables\n",
-        "GCP_PROJECT_ID = \"YOUR_GCP_PROJECT_ID\" # Replace with your active project\n",
-        "GCS_BUCKET_NAME = \"your-gemma-gcp-bucket\" # Replace with your bucket\n",
-        "\n",
-        "# Set active gcloud SDK project\n",
-        "!gcloud config set project {GCP_PROJECT_ID}\n",
-        "\n",
-        "# 3. Create GCS bucket if not exists (using gcloud)\n",
-        "!gcloud storage buckets create gs://{GCS_BUCKET_NAME} --location=us-central1\n",
-        "\n",
-        "# 4. Upload local fine-tuned adapter directory to GCS\n",
-        "!gcloud storage cp -r ./fine_tuned_gemma_adapter gs://{GCS_BUCKET_NAME}/gemma-4-adapters/\n",
-        "print(f\"\\n🎉 Successfully uploaded fine-tuned adapter weights to: gs://{GCS_BUCKET_NAME}/gemma-4-adapters/\")"
-    ])
-    
-    # --- CELL 16: Markdown Section 7 (Hugging Face Hub and Browser Download) ---
-    add_markdown([
-        "## 🤗 Step 8: Alternative Export Methods (Hugging Face Hub & Browser Download)",
+        "### 🌐 Deploying to Google Cloud Run",
+        "Now that your adapter weights are safely stored in GCS (Option 3) or Hugging Face (Option 2), you can immediately transition to serving this model in production:",
+        "- Check out our local server script **`serve.py`** in this workspace. It sets up an OpenAI-compatible FastAPI endpoints and downloads your adapters dynamically during startup.",
+        "- We have provided a complete Docker setup (`Dockerfile.serve` and `service.yaml`) so you can deploy this serving container directly to **Google Cloud Run on Serverless GPUs** in just one command!",
         "",
-        "If you want to share your fine-tuned model with others so they can immediately test its behavior, or simply keep a local backup on your machine without using a GCP storage bucket, you can use these two highly convenient alternative export methods.",
-        "",
-        "### 🛒 Option A: Share publicly on the Hugging Face Hub (Recommended)",
-        "Uploading your adapter directly to the Hugging Face Hub makes it incredibly easy for others to load and use. Anyone else running this notebook (or your local serving script) can simply reference your public model ID (e.g., `your_username/gemma-4-sentiment-adapter`) to run instant inference!"
-    ])
-    
-    # --- CELL 17: Push to HF Hub block ---
-    add_code([
-        "#@title 🤗 Share adapter publicly on Hugging Face Hub { run: \"manual\" }\n",
-        "#@markdown Enter your Hugging Face username and desired repository name below.\n",
-        "#@markdown Make sure you logged in with a WRITE token in Step 1!\n",
-        "\n",
-        "HF_USERNAME = \"your_hf_username\" #@param {type:\"string\"}\n",
-        "HF_REPO_NAME = \"gemma-4-sentiment-adapter\" #@param {type:\"string\"}\n",
-        "\n",
-        "hub_model_id = f\"{HF_USERNAME}/{HF_REPO_NAME}\"\n",
-        "\n",
-        "if HF_USERNAME == \"your_hf_username\":\n",
-        "    print(\"⚠️ Please enter your real Hugging Face username in the form-field above!\")\n",
-        "else:\n",
-        "    print(f\"⏳ Pushing adapter weights and tokenizer to Hugging Face Hub: {hub_model_id}...\")\n",
-        "    try:\n",
-        "        # Push the PEFT adapter model and base tokenizer\n",
-        "        trainer.model.push_to_hub(hub_model_id, private=False)\n",
-        "        base_tokenizer.push_to_hub(hub_model_id, private=False)\n",
-        "        print(f\"\\n🎉 Successfully pushed to HF Hub! View it at: https://huggingface.co/{hub_model_id}\")\n",
-        "        print(\"\\n💡 Others can load and use your adapter directly using:\")\n",
-        "        print(f\"   PeftModel.from_pretrained(base_model, \\\"{hub_model_id}\\\")\")\n",
-        "    except Exception as e:\n",
-        "        print(f\"\\n❌ Push failed: {e}\")\n",
-        "        print(\"💡 Did you use a token with WRITE permissions during login in Step 1?\")"
-    ])
-    
-    # --- CELL 18: Browser Download markdown ---
-    add_markdown([
-        "### 📥 Option B: Download directly to your local machine",
-        "",
-        "If you don't have a Google Cloud or Hugging Face account and just want a local copy of your fine-tuned weights, you can compress the adapter directory into a `.zip` archive and download it directly through your web browser."
-    ])
-    
-    # --- CELL 19: Browser Download block ---
-    add_code([
-        "import os\n",
-        "import zipfile\n",
-        "from google.colab import files\n",
-        "\n",
-        "zip_path = \"./fine_tuned_gemma_adapter.zip\"\n",
-        "adapter_dir = \"./fine_tuned_gemma_adapter\"\n",
-        "\n",
-        "print(\"⏳ Compressing fine-tuned adapter folder...\")\n",
-        "with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:\n",
-        "    for root, dirs, files_in_dir in os.walk(adapter_dir):\n",
-        "        for file in files_in_dir:\n",
-        "            file_path = os.path.join(root, file)\n",
-        "            # Maintain relative path inside zip\n",
-        "            arcname = os.path.relpath(file_path, os.path.dirname(adapter_dir))\n",
-        "            zipf.write(file_path, arcname)\n",
-        "\n",
-        "print(f\"✅ Compression complete! File size: {os.path.getsize(zip_path) / (1024*1024):.2f} MB\")\n",
-        "print(\"⏳ Starting browser download. Please allow popups if prompted...\")\n",
-        "files.download(zip_path)"
+        "Keep up the amazing work in your AI journey!"
     ])
 
     # Save to disk
