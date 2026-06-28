@@ -1,0 +1,57 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: gemma-4-finetune
+  labels:
+    cloud.googleapis.com/location: us-central1 # L4 GPUs are available in us-central1
+spec:
+  template:
+    metadata:
+      annotations:
+        # Mandatory for GPUs: disable zonal redundancy
+        run.googleapis.com/gpu-zonal-redundancy-disabled: 'true'
+    spec:
+      template:
+        spec:
+          containers:
+          - image: us-central1-docker.pkg.dev/${PROJECT_ID}/gemma-4-repo/gemma-4-train:latest
+            resources:
+              limits:
+                cpu: '8'                # Recommended minimum for L4 is 4, 8 is optimal
+                memory: '32Gi'          # Recommended minimum for L4 is 16Gi, 32Gi is optimal
+                nvidia.com/gpu: '1'     # Attach 1 GPU (max 1 is supported)
+            env:
+            - name: HF_TOKEN
+              value: "${HF_TOKEN}"
+
+            # OPTION B: Secret Manager (uncomment to use for production)
+            # - name: HF_TOKEN
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: HF_TOKEN_SECRET_NAME
+            #       key: "latest"
+
+            # Optional training arguments override
+            - name: MODEL_ID
+              value: "google/gemma-4-E4B" # Or "google/gemma-4-E4B" for base
+
+            # GCS Output Bucket to persist adapter weights
+            - name: GCS_BUCKET
+              value: "gemma-gcp-bucket"
+
+            # Pass arguments directly to python train.py
+            args:
+            - "--model_id"
+            - "google/gemma-4-E4B-it"
+            - "--dataset_name_or_path"
+            - "trl-lib/Capybara" # Default training dataset
+            - "--gcs_bucket"
+            - "gemma-gcp-bucket" # Will upload final weights to gs://BUCKET/gemma-4-adapters/
+            - "--gcs_prefix"
+            - "gemma-4-adapters"
+
+            nodeSelector:
+              run.googleapis.com/accelerator: nvidia-l4
+
+          # Max execution time (up to 24h/86400s)
+          timeoutSeconds: 86400
