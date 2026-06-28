@@ -220,7 +220,7 @@ def main():
         model=model,
         train_dataset=dataset,
         peft_config=lora_config,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         args=sft_config,
     )
     
