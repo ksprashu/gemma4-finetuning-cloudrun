@@ -879,6 +879,12 @@
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
+                <li>
+                    <a href="#chapter6" class="nav-item" onclick="setActiveNav(this)">
+                        <span>6. Agentic Dataset Prep</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
             </ul>
 
             <div class="nav-section-title">Diagnostics</div>
@@ -1386,6 +1392,92 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
                 <h3>6. Secret Leakage &amp; Secure GCP Secret Manager Fallback</h3>
                 <p><strong>The Symptom:</strong> Hugging Face model access requires authentication via <code>HF_TOKEN</code>. Storing this token as a plaintext string inside source files represents a critical security risk.</p>
                 <p><strong>The Remediation:</strong> We engineered a robust Secret Manager retrieval strategy in <code>train.py</code> and <code>serve.py</code>, mounting the project environment variables to Google Secret Manager, with an in-code API resolver fallback if local environments lack local environment settings.</p>
+            </article>
+
+            <!-- CHAPTER 6: AGENTIC DATASET PREPARATION -->
+            <article id="chapter6">
+                <span class="book-badge">Chapter 6</span>
+                <h2>Agentic Dataset Synthesis with Google Antigravity (AGY)</h2>
+                <p>For high-fidelity training data that captures nuanced human communication styles, static templates fall short. Google Antigravity (AGY) offers a powerful alternative: using autonomous agents acting as a <strong>Producer Archetype</strong> to generate highly varied, schema-compliant, and diverse datasets.</p>
+
+                <div class="note-box" style="background-color: var(--primary-light); border-left: 4px solid var(--primary); padding: 1rem; border-radius: 4px; margin-bottom: 2rem;">
+                    <strong>Setup and Execution:</strong>
+                    <ul style="margin-top: 0.5rem; margin-bottom: 0;">
+                        <li><strong>Antigravity CLI:</strong> Run <code>agy</code> in your terminal.</li>
+                        <li><strong>Antigravity 2.0 (UI):</strong> Launch the Desktop Client and open your project folder to grant workspace access.</li>
+                    </ul>
+                </div>
+
+                <h3>Four Enterprise Dataset Synthesis Prompts</h3>
+                <p>These four prompts can be copied and pasted directly into AGY to generate high-value, production-grade custom datasets:</p>
+
+                <div style="display: flex; flex-direction: column; gap: 2.5rem; margin-top: 2rem;">
+                    <!-- Use Case 1 -->
+                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">1. Sarcastic Sentiment &amp; Emotion Classifier</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train a classifier to identify subtle sarcasm, double-negations, and frustrated tones.</p>
+                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
+Task: Create a synthetic fine-tuning dataset of 1000 highly varied sentiment and emotional classification samples.
+Constraints:
+- Out of these, 400 must contain subtle sarcasm, 200 mixed-sentiments, 200 double-negations, and 200 realistic typos/slang.
+- Target sentiment classes: "Positive", "Negative", "Sarcastic", "Frustrated".
+- Format: Save the output directly as a JSON Lines (.jsonl) file in my current workspace named `sentiment_dataset.jsonl`.
+- Schema: Every line must be a single JSON object matching this structure exactly:
+  {"messages": [{"role": "user", "content": "Classify the sentiment: '&lt;REVIEW_TEXT&gt;'"}, {"role": "model", "content": "&lt;LABEL&gt;"}]}
+
+Begin generating now, ensuring diverse vocabulary across sectors (food, apps, hotels, tech gadgets). Avoid repeating review structures.</code></pre>
+                    </div>
+
+                    <!-- Use Case 2 -->
+                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">2. Multilingual Support Ticket Router</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train a gatekeeper model to route customer support tickets in multiple languages to structured JSON payloads.</p>
+                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
+Task: Create a synthetic fine-tuning dataset of 1000 customer support triage samples.
+Constraints:
+- The input review should be in random languages (English, Spanish, French, German, Japanese, Hindi).
+- The model must output a JSON block indicating category and priority.
+- Target Categories: "billing", "technical_support", "account_security", "refund_request".
+- Target Priorities: "critical", "high", "medium", "low".
+- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `triage_dataset.jsonl`.
+- Schema: Every line must be a single JSON object matching this structure exactly:
+  {"messages": [{"role": "user", "content": "Triage this support ticket: '&lt;TICKET_TEXT&gt;'"}, {"role": "model", "content": "{\\\"category\\\": \\\"&lt;CAT&gt;\\\", \\\"priority\\\": \\\"&lt;PRIORITY&gt;\\\"}"}]}
+
+Begin generating now, ensuring highly realistic support scenarios (e.g. payment failure, locked out of account, api latency, pricing query).</code></pre>
+                    </div>
+
+                    <!-- Use Case 3 -->
+                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">3. Text-to-API Payload Copilot</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train a text-to-API translation engine to output schema-compliant REST API JSON function calls.</p>
+                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
+Task: Create a synthetic fine-tuning dataset of 1000 Text-to-API function call translation samples.
+Constraints:
+- The user prompt should be a natural language request to perform an action (e.g., book a flight, update a user profile, send a notification).
+- The model response should be a formatted, structured REST API payload.
+- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `api_dataset.jsonl`.
+- Schema: Every line must be a single JSON object matching this structure exactly:
+  {"messages": [{"role": "user", "content": "Translate to API payload: '&lt;REQUEST_TEXT&gt;'"}, {"role": "model", "content": "{\\\"action\\\": \\\"&lt;ACTION&gt;\\\", \\\"params\\\": {&lt;PARAMETERS&gt;}}"}]}
+
+Ensure wide variety of operations (Create, Read, Update, Delete) across CRM, booking, and notification system paradigms.</code></pre>
+                    </div>
+
+                    <!-- Use Case 4 -->
+                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">4. Enterprise PII Redactor</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train Gemma to redact sensitive information (SSN, credit card, emails) from conversational chat histories.</p>
+                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
+Task: Create a synthetic fine-tuning dataset of 1000 PII anonymization samples.
+Constraints:
+- The input should be a conversational transcript containing names, credit card numbers, email addresses, phone numbers, or SSNs.
+- The model response must be the exact same transcript, but with all PII replaced by standardized tags like `[REDACTED_NAME]`, `[REDACTED_EMAIL]`, `[REDACTED_PHONE]`, `[REDACTED_CARD]`.
+- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `pii_dataset.jsonl`.
+- Schema: Every line must be a single JSON object matching this structure exactly:
+  {"messages": [{"role": "user", "content": "Redact PII from this transcript: '&lt;TRANSCRIPT&gt;'"}, {"role": "model", "content": "&lt;REDACTED_TRANSCRIPT&gt;"}]}
+
+Ensure diverse realistic chat snippets with conversational natural flow, typos, and varied customer service contexts.</code></pre>
+                    </div>
+                </div>
             </article>
 
             <!-- INTERACTIVE TROUBLESHOOTING HUB -->

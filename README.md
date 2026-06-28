@@ -223,98 +223,16 @@ This writes the dataset locally to `sentiment_dataset.jsonl` matching Gemma's co
 ---
 
 ### Pathway B: Agentic Synthesis with Google Antigravity (AGY)
-> [!TIP]
-> Programmatic scripts use pre-defined templates, which limits vocabulary diversity and semantic range. For production-grade fine-tuning, you need high-fidelity synthetic data. By using the **AGY CLI (`agy`)** or **Antigravity 2.0 Desktop app**, you can command the AI to act as a **Producer Archetype** to generate thousands of unique, natural, and complex samples with structured schema constraints.
 
-#### 1. Setup and Install AGY
-Ensure you have AGY running on your local machine:
-* **Antigravity CLI**: Run `agy` in your terminal to start an interactive agentic session. Authenticate with Google on the first run.
-* **Antigravity 2.0 (UI)**: Launch the parallel Desktop Client. Open your project folder to grant workspace access.
+For production-grade fine-tuning, programmatic templates are often limited in vocabulary diversity and semantic range. To build high-fidelity training datasets, we recommend using **Google Antigravity (AGY)**.
 
-#### 2. Fine-Tuning Ideas & Sample AGY Prompts
-Here are four high-value domain-specific use cases you can fine-tune Gemma 4 on, along with the precise prompts you can paste directly into AGY to generate your custom training datasets:
+By commanding the AI to act as a **Producer Archetype** inside AGY, you can agentically synthesize thousands of highly natural and complex training samples across various domain-specific use cases.
 
-````carousel
-### 1. Sarcastic Sentiment & Emotion Classifier
-**Idea:** Train a highly sensitive classifier that goes beyond simple positive/negative to capture nuanced emotions, sarcasm, and passive-aggressive tones.
+We have moved the extensive AGY setup guide and our four enterprise-grade dataset generation prompts (Sarcastic Sentiment Classifier, Multilingual Support Ticket Router, Text-to-API Payload Copilot, and Enterprise PII Redactor) to a dedicated guide:
 
-**AGY Prompt:**
-```text
-Role: Act as a data generation engineer (Producer Archetype).
-Task: Create a synthetic fine-tuning dataset of 1000 highly varied sentiment and emotional classification samples.
-Constraints:
-- Out of these, 400 must contain subtle sarcasm, 200 mixed-sentiments, 200 double-negations, and 200 realistic typos/slang.
-- Target sentiment classes: "Positive", "Negative", "Sarcastic", "Frustrated".
-- Format: Save the output directly as a JSON Lines (.jsonl) file in my current workspace named `sentiment_dataset.jsonl`.
-- Schema: Every line must be a single JSON object matching this structure exactly:
-  {"messages": [{"role": "user", "content": "Classify the sentiment: '<REVIEW_TEXT>'"}, {"role": "model", "content": "<LABEL>"}]}
+👉 **[Agentic Dataset Synthesis with AGY Guide](knowledgebase/6_agy_dataset_prep.md)**
 
-Begin generating now, ensuring diverse vocabulary across sectors (food, apps, hotels, tech gadgets). Avoid repeating review structures.
-```
-<!-- slide -->
-### 2. Multilingual Support Ticket Router
-**Idea:** Train Gemma to behave as an intelligent IT support gateway that parses customer tickets in multiple languages and outputs a structured triage payload.
-
-**AGY Prompt:**
-```text
-Role: Act as a data generation engineer (Producer Archetype).
-Task: Create a synthetic fine-tuning dataset of 1000 customer support triage samples.
-Constraints:
-- The input review should be in random languages (English, Spanish, French, German, Japanese, Hindi).
-- The model must output a JSON block indicating category and priority.
-- Target Categories: "billing", "technical_support", "account_security", "refund_request".
-- Target Priorities: "critical", "high", "medium", "low".
-- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `triage_dataset.jsonl`.
-- Schema: Every line must be a single JSON object matching this structure exactly:
-  {"messages": [{"role": "user", "content": "Triage this support ticket: '<TICKET_TEXT>'"}, {"role": "model", "content": "{\\\"category\\\": \\\"<CAT>\\\", \\\"priority\\\": \\\"<PRIORITY>\\\"}"}]}
-
-Begin generating now, ensuring highly realistic support scenarios (e.g. payment failure, locked out of account, api latency, pricing query).
-```
-<!-- slide -->
-### 3. Text-to-API Payload Copilot
-**Idea:** Fine-tune Gemma to act as a natural language function caller, mapping spoken intents into structured REST API JSON payloads for backend services.
-
-**AGY Prompt:**
-```text
-Role: Act as a data generation engineer (Producer Archetype).
-Task: Create a synthetic fine-tuning dataset of 1000 Text-to-API function call translation samples.
-Constraints:
-- The user prompt should be a natural language request to perform an action (e.g., book a flight, update a user profile, send a notification).
-- The model response should be a formatted, structured REST API payload.
-- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `api_dataset.jsonl`.
-- Schema: Every line must be a single JSON object matching this structure exactly:
-  {"messages": [{"role": "user", "content": "Translate to API payload: '<REQUEST_TEXT>'"}, {"role": "model", "content": "{\\\"action\\\": \\\"<ACTION>\\\", \\\"params\\\": {<PARAMETERS>}}"}]}
-
-Ensure wide variety of operations (Create, Read, Update, Delete) across CRM, booking, and notification system paradigms.
-```
-<!-- slide -->
-### 4. Enterprise PII Redactor
-**Idea:** Train Gemma to process raw customer service chats and automatically mask/redact sensitive Personally Identifiable Information (PII) before logging.
-
-**AGY Prompt:**
-```text
-Role: Act as a data generation engineer (Producer Archetype).
-Task: Create a synthetic fine-tuning dataset of 1000 PII anonymization samples.
-Constraints:
-- The input should be a conversational transcript containing names, credit card numbers, email addresses, phone numbers, or SSNs.
-- The model response must be the exact same transcript, but with all PII replaced by standardized tags like `[REDACTED_NAME]`, `[REDACTED_EMAIL]`, `[REDACTED_PHONE]`, `[REDACTED_CARD]`.
-- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `pii_dataset.jsonl`.
-- Schema: Every line must be a single JSON object matching this structure exactly:
-  {"messages": [{"role": "user", "content": "Redact PII from this transcript: '<TRANSCRIPT>'"}, {"role": "model", "content": "<REDACTED_TRANSCRIPT>"}]}
-
-Ensure diverse realistic chat snippets with conversational natural flow, typos, and varied customer service contexts.
-```
-````
-
-#### 3. Execution in AGY
-Simply launch the `agy` CLI or open the Antigravity 2.0 Chat, paste any of the prompts above, and press **Enter**. 
-
-The agent will automatically:
-1. Act as a **Producer** to spin up subagents/tasks.
-2. Formulate a schema-safe list of high-diversity training instances.
-3. Save the results directly into your workspace as a `.jsonl` file (e.g. `sentiment_dataset.jsonl`, `triage_dataset.jsonl`).
-
-Once generated, you can upload your custom file to your GCS Bucket in the next step!
+Once your dataset has been generated and saved locally as a `.jsonl` file, you can upload it to Google Cloud Storage in the next step!
 
 ### 4. Create the GCS Bucket & Upload
 To create a GCS bucket, you can use either the modern `gcloud storage` command or the traditional `gsutil` utility. Ensure you create it in a region that supports L4 GPUs (e.g., `us-central1`):
