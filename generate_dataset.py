@@ -331,7 +331,7 @@ def generate_dataset(num_samples=2000):
     return samples
 
 def main():
-    target_count = 2000
+    target_count = int(os.getenv("DATASET_SIZE", "2000"))
     print(f"Generating {target_count} highly varied sentiment analysis samples...")
     dataset = generate_dataset(target_count)
     
@@ -346,8 +346,12 @@ def main():
     print(f" - Negative: {neg_count} ({neg_count/len(dataset)*100:.1f}%)")
     print(f" - Neutral:  {neu_count} ({neu_count/len(dataset)*100:.1f}%)")
     
-    # Write to sentiment_dataset.jsonl
-    output_file = "/Users/ksprashanth/code/sandbox/gemma4-finetuning/sentiment_dataset.jsonl"
+    # Resolve output file path from environment variable or fallback to default
+    output_file = os.getenv("OUTPUT_FILE")
+    if not output_file:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        output_file = os.path.join(script_dir, "sentiment_dataset.jsonl")
+        
     print(f"\nWriting dataset to: {output_file}...")
     
     with open(output_file, "w", encoding="utf-8") as f:

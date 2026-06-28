@@ -98,10 +98,11 @@ def upload_directory_to_gcs(local_dir, bucket_name, gcs_prefix):
         logger.error("google-cloud-storage not installed. Cannot upload to GCS.")
     except Exception as e:
         logger.error(f"Failed to upload to GCS: {e}")
-def custom_prepare_model_for_kbit_training(model, use_gradient_checkpointing=True, gradient_checkpointing_kwargs=None):
+def custom_prepare_model_for_kbit_training(model, use_gradient_checkpointing=True, gradient_checkpointing_kwargs=None, compute_dtype=torch.bfloat16):
     """Memory-efficient model preparation for k-bit training on Gemma models.
     Only upcasts layernorms (norm, ln) to float32 to prevent upcasting embeddings
     and lm_head, saving ~8.75 GiB of VRAM from being allocated.
+    Also handles downcasting residual bfloat16 buffers on FP16 hardware (like T4).
     """
     for name, param in model.named_parameters():
         param.requires_grad = False
@@ -111,6 +112,16 @@ def custom_prepare_model_for_kbit_training(model, use_gradient_checkpointing=Tru
             if param.dtype in [torch.float16, torch.bfloat16]:
                 param.data = param.data.to(torch.float32)
     
+    # If training on standard non-bf16 hardware (like T4), we must downcast any residual bfloat16 params/buffers to float16
+    if compute_dtype == torch.float16:
+        logger.info("Downcasting residual bfloat16 parameters and buffers to float16 for T4 compatibility...")
+        for name, buf in model.named_buffers():
+            if buf.dtype == torch.bfloat16:
+                buf.data = buf.data.to(torch.float16)
+        for name, param in model.named_parameters():
+            if param.dtype == torch.bfloat16 and param.__class__.__name__ != "Params4bit":
+                param.data = param.data.to(torch.float16)
+
     if use_gradient_checkpointing:
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs=gradient_checkpointing_kwargs)
         if hasattr(model, "enable_input_require_grads"):
@@ -121,14 +132,40 @@ def custom_prepare_model_for_kbit_training(model, use_gradient_checkpointing=Tru
             model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
     return model
 
+def resolve_hf_token():
+    """Resolves Hugging Face Token from environment or Google Secret Manager."""
+    if "HF_TOKEN" in os.environ and os.environ["HF_TOKEN"].strip():
+        return os.environ["HF_TOKEN"]
+    
+    # Check if we can load from GCP Secrets
+    try:
+        from google.cloud import secretmanager
+        project_id = os.environ.get("GCP_PROJECT") or os.environ.get("PROJECT_ID")
+        secret_name = os.environ.get("HF_TOKEN_SECRET_NAME", "HF_TOKEN")
+        if project_id:
+            logger.info(f"HF_TOKEN not in env. Attempting to fetch secret '{secret_name}' from GCP Secret Manager for project '{project_id}'...")
+            client = secretmanager.SecretManagerServiceClient()
+            name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+            response = client.access_secret_version(request={"name": name})
+            token = response.payload.data.decode("UTF-8").strip()
+            logger.info("Successfully retrieved HF_TOKEN from GCP Secret Manager.")
+            os.environ["HF_TOKEN"] = token
+            return token
+    except Exception as e:
+        logger.debug(f"Could not retrieve secret from Secret Manager: {e}")
+        
+    return None
+
+
 def main():
     args = parse_args()
     
-    # Verify HF Token is set
-    if "HF_TOKEN" not in os.environ:
+    # Resolve HF Token
+    token = resolve_hf_token()
+    if not token:
         logger.warning(
-            "HF_TOKEN environment variable is not set. Gemma 4 is a gated model, "
-            "so you must provide an authorized token to download it."
+            "HF_TOKEN environment variable is not set and could not be fetched from Secret Manager. "
+            "Gemma 4 is a gated model, so you must provide an authorized token to download it."
         )
     
     # 1. Load Dataset
@@ -183,12 +220,25 @@ def main():
     
     logger.info(f"Dataset loaded. Number of examples: {len(dataset)}")
     
-    # 2. Configure 4-bit quantization (QLoRA)
+    # 2. Configure 4-bit quantization (QLoRA) based on GPU capabilities
     logger.info("Configuring 4-bit quantization (BitsAndBytes)...")
+    
+    # Check GPU capability for BF16 support (e.g., L4, A100, H100 support BF16, T4 does not)
+    if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+        compute_dtype = torch.bfloat16
+        fp16 = False
+        bf16 = True
+        logger.info("GPU supports bfloat16. Setting compute_dtype=torch.bfloat16, bf16=True.")
+    else:
+        compute_dtype = torch.float16
+        fp16 = True
+        bf16 = False
+        logger.info("bfloat16 is NOT supported or no GPU is available. Setting compute_dtype=torch.float16, fp16=True.")
+        
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_compute_dtype=compute_dtype,
         bnb_4bit_use_double_quant=True,
     )
     
@@ -214,7 +264,7 @@ def main():
         logger.info(f"Successfully unwrapped {unwrapped_count} Gemma4ClippableLinear modules.")
     
     # Prepare model for k-bit training (e.g. gradient checkpointing setup)
-    model = custom_prepare_model_for_kbit_training(model)
+    model = custom_prepare_model_for_kbit_training(model, compute_dtype=compute_dtype)
     
     logger.info(f"Loading tokenizer: {args.model_id}")
     tokenizer = AutoTokenizer.from_pretrained(args.model_id)
@@ -255,7 +305,7 @@ def main():
     # 5. SFTTrainer Configuration
     logger.info("Initializing SFTTrainer...")
     
-    # Use modern TRL SFTConfig
+    # Use modern TRL SFTConfig with dynamic fp16/bf16 settings
     sft_config = SFTConfig(
         output_dir=args.output_dir,
         num_train_epochs=args.num_train_epochs,
@@ -269,8 +319,8 @@ def main():
         logging_steps=args.logging_steps,
         save_strategy="epoch",
         eval_strategy="no",
-        fp16=False,
-        bf16=True, # Recommended for L4 GPU
+        fp16=fp16,
+        bf16=bf16,
         optim="paged_adamw_8bit", # Memory-efficient optimizer for QLoRA
         max_length=args.max_seq_length,
         report_to="none", # Avoid requiring wandb/tensorboard logins

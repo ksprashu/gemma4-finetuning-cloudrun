@@ -97,6 +97,29 @@ def download_gcs_directory(gcs_url: str, local_dir: str):
         logger.error(f"Failed to download from GCS: {e}")
         raise RuntimeError(f"GCS download failed: {e}")
 
+def resolve_hf_token():
+    """Resolves Hugging Face Token from environment or Google Secret Manager."""
+    if "HF_TOKEN" in os.environ and os.environ["HF_TOKEN"].strip():
+        return os.environ["HF_TOKEN"]
+    
+    try:
+        from google.cloud import secretmanager
+        project_id = os.environ.get("GCP_PROJECT") or os.environ.get("PROJECT_ID")
+        secret_name = os.environ.get("HF_TOKEN_SECRET_NAME", "HF_TOKEN")
+        if project_id:
+            logger.info(f"HF_TOKEN not in env. Attempting to fetch secret '{secret_name}' from GCP Secret Manager for project '{project_id}'...")
+            client = secretmanager.SecretManagerServiceClient()
+            name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+            response = client.access_secret_version(request={"name": name})
+            token = response.payload.data.decode("UTF-8").strip()
+            logger.info("Successfully retrieved HF_TOKEN from GCP Secret Manager.")
+            os.environ["HF_TOKEN"] = token
+            return token
+    except Exception as e:
+        logger.debug(f"Could not retrieve secret from Secret Manager: {e}")
+        
+    return None
+
 @app.on_event("startup")
 def startup_event():
     global model, tokenizer
@@ -110,8 +133,9 @@ def startup_event():
         logger.info(f"LoRA Adapter Path: {lora_path}")
         
     # Check for Hugging Face token
-    if "HF_TOKEN" not in os.environ:
-        logger.warning("HF_TOKEN is not defined in environment variables. Model download might fail for gated repositories.")
+    token = resolve_hf_token()
+    if not token:
+        logger.warning("HF_TOKEN is not defined in environment or Secret Manager. Model download might fail for gated repositories.")
         
     # Configure 4-bit Quantization (essential for deploying on a single L4 GPU)
     bnb_config = BitsAndBytesConfig(
@@ -177,6 +201,9 @@ def startup_event():
     else:
         model = base_model
         
+    # Disable cache to prevent PyTorch dimension mismatch bugs during inference
+    model.config.use_cache = False
+        
     # Set standard Gemma chat template if not present (essential for handling conversational queries)
     if tokenizer.chat_template is None:
         logger.info("Setting standard Gemma chat template on serving tokenizer.")
@@ -235,6 +262,11 @@ def generate(request: GenerateRequest):
         generated_ids = outputs[0][prompt_length:]
         generated_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
         
+        # Clean up any special token bleeding or trailing markers (e.g. <end_of_turn>\n<)
+        if "<" in generated_text:
+            generated_text = generated_text.split("<")[0]
+        generated_text = generated_text.strip()
+        
         return GenerateResponse(
             output=generated_text,
             prompt_tokens=prompt_length,
@@ -280,6 +312,11 @@ def chat_completions(request: ChatCompletionRequest):
             
         generated_ids = outputs[0][prompt_length:]
         generated_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
+        
+        # Clean up any special token bleeding or trailing markers (e.g. <end_of_turn>\n<)
+        if "<" in generated_text:
+            generated_text = generated_text.split("<")[0]
+        generated_text = generated_text.strip()
         
         # Formulate OpenAI compatible response
         return {
