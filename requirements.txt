@@ -7,7 +7,6 @@ bitsandbytes>=0.45.3
 datasets>=3.3.2
 huggingface-hub>=0.29.3
 safetensors>=0.5.3
-scipy
 
 # Google Cloud Platform integration
 google-cloud-storage>=2.16.0

@@ -73,7 +73,7 @@ def build_notebook():
     # --- CELL 2: Install dependencies ---
     add_code([
         "# Install required packages for training, quantization, and GCS integrations\n",
-        "!pip install -q -U transformers peft trl bitsandbytes accelerate datasets google-cloud-storage scipy"
+        "!pip install -q -U transformers peft trl bitsandbytes accelerate datasets google-cloud-storage"
     ])
 
     # --- CELL 3: Hugging Face Login ---
