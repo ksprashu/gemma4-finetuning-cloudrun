@@ -104,12 +104,14 @@ export EVAL_MODE=1
 ├── train.py                  # Fine-tuning script supporting QLoRA & GCS integration
 ├── serve.py                  # FastAPI inference server with dynamic GCS adapter loading
 ├── generate_dataset.py       # Programmatic generator for nuanced sentiment analysis data
+├── evaluation_check.py       # Core evaluation script for remote or local model precision checks
 ├── requirements.txt          # Shared Python dependencies
 ├── Dockerfile.train          # Container specification for Cloud Run Job (Fine-tuning)
 ├── Dockerfile.serve          # Container specification for Cloud Run Service (Inference)
 ├── job.yaml                  # Declarative spec for Cloud Run Job
 ├── service.yaml              # Declarative spec for Cloud Run Service
 ├── test_client.py            # CLI test client for raw and chat completion endpoints
+├── test_notebook_precision.py # Static and syntax validation suite for the Colab notebook
 ├── create_colab_notebook.py  # Script to compile the companion Jupyter notebook
 ├── gemma4_colab_finetuning.ipynb # Interactive, OOM-safe companion notebook for Colab testing
 └── README.md                 # This comprehensive architecture & operational guide
