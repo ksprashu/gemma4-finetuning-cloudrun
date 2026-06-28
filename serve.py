@@ -216,6 +216,7 @@ def generate(request: GenerateRequest):
         
     try:
         inputs = tokenizer(request.prompt, return_tensors="pt").to(model.device)
+        inputs.pop("token_type_ids", None) # Remove token_type_ids if present to avoid generation dimension mismatch
         prompt_length = inputs.input_ids.shape[1]
         
         with torch.no_grad():
@@ -261,6 +262,7 @@ def chat_completions(request: ChatCompletionRequest):
         )
         
         inputs = tokenizer(formatted_prompt, return_tensors="pt").to(model.device)
+        inputs.pop("token_type_ids", None) # Remove token_type_ids if present to avoid generation dimension mismatch
         prompt_length = inputs.input_ids.shape[1]
         
         with torch.no_grad():

@@ -700,6 +700,106 @@ def build_notebook():
         "print(f\"💾 Fine-tuned adapter saved locally to '{adapter_dir}'\")"
     ])
 
+    # --- CELL 12.5: Google Drive Saving Markdown ---
+    add_markdown([
+        "## 💾 Step 5.5: Saving & Restoring Adapter Weights (Google Drive Integration)",
+        "",
+        "Because Google Colab's default local directory is **ephemeral**, any files saved there (like `./fine_tuned_gemma_adapter`) will be **lost completely** if the notebook runtime disconnects, resets, or if you restart your session.",
+        "",
+        "To make your hard work permanent and resilient, you can mount your personal **Google Drive** and save the adapter there. When you open this notebook in a fresh session next time, you can simply mount Google Drive and load your pre-trained adapter in **2 seconds flat**—completely bypassing the 5-minute training phase!",
+        "",
+        "### 📂 Option A: Save fine-tuned adapter to Google Drive"
+    ])
+
+    # --- CELL 12.6: Google Drive Saving Block ---
+    add_code([
+        "import shutil\n",
+        "import os\n",
+        "\n",
+        "try:\n",
+        "    from google.colab import drive\n",
+        "    print(\"⏳ Mounting Google Drive to save adapter permanently...\")\n",
+        "    drive.mount('/content/drive')\n",
+        "    \n",
+        "    gdrive_adapter_path = \"/content/drive/MyDrive/fine_tuned_gemma_adapter\"\n",
+        "    \n",
+        "    print(f\"⏳ Copying adapter weights from local session to Google Drive at '{gdrive_adapter_path}'...\")\n",
+        "    if os.path.exists(gdrive_adapter_path):\n",
+        "        shutil.rmtree(gdrive_adapter_path)\n",
+        "    shutil.copytree(\"./fine_tuned_gemma_adapter\", gdrive_adapter_path)\n",
+        "    print(\"🎉 SUCCESS! Your fine-tuned adapter has been saved permanently to your Google Drive.\")\n",
+        "    print(\"💡 You can now safely close this Colab runtime or restart the session.\")\n",
+        "except Exception as e:\n",
+        "    print(f\"❌ Failed to save to Google Drive (make sure to grant permissions): {e}\")"
+    ])
+
+    # --- CELL 12.7: Loading Markdown ---
+    add_markdown([
+        "### 🔄 Option B: Restore/Load an existing adapter (Bypass Retraining!)",
+        "",
+        "If you have already trained your model and saved your adapter to Google Drive, or if you pushed it to the Hugging Face Hub, you do **not** need to run Step 5 (the training loop) again!",
+        "",
+        "Run Step 1, Step 3 (to load the base model), and then use this interactive cell below to load your adapter directly. This will instantly configure your model for inference!"
+    ])
+
+    # --- CELL 12.8: Loading Block ---
+    add_code([
+        "#@title 🔄 Restore Adapter weights { run: \"manual\" }\n",
+        "LOAD_SOURCE = \"Google Drive\" #@param [\"Local Directory\", \"Google Drive\", \"Hugging Face Hub\"]\n",
+        "HF_MODEL_ID = \"username/gemma-4-sentiment-adapter\" #@param {type:\"string\"}\n",
+        "\n",
+        "import os\n",
+        "from peft import PeftModel\n",
+        "\n",
+        "adapter_path = \"./fine_tuned_gemma_adapter\"\n",
+        "\n",
+        "if LOAD_SOURCE == \"Google Drive\":\n",
+        "    try:\n",
+        "        from google.colab import drive\n",
+        "        print(\"⏳ Mounting Google Drive to restore adapter...\")\n",
+        "        drive.mount('/content/drive')\n",
+        "        gdrive_path = \"/content/drive/MyDrive/fine_tuned_gemma_adapter\"\n",
+        "        if os.path.exists(gdrive_path):\n",
+        "            adapter_path = gdrive_path\n",
+        "            print(f\"✅ Successfully located adapter in Google Drive: {adapter_path}\")\n",
+        "        else:\n",
+        "            print(\"⚠️ Warning: Adapter folder not found in Google Drive! Make sure you saved it first.\")\n",
+        "    except Exception as e:\n",
+        "        print(f\"❌ Failed to mount Google Drive: {e}\")\n",
+        "elif LOAD_SOURCE == \"Hugging Face Hub\":\n",
+        "    adapter_path = HF_MODEL_ID\n",
+        "    print(f\"✅ Loading adapter from Hugging Face Hub: {adapter_path}\")\n",
+        "else:\n",
+        "    print(f\"✅ Loading from local directory: {adapter_path}\")\n",
+        "\n",
+        "try:\n",
+        "    print(\"⏳ Wrapping base model with PEFT adapter...\")\n",
+        "    if 'base_model' in globals():\n",
+        "        # Load/re-load the PEFT model wrapper\n",
+        "        if hasattr(base_model, \"unload\"):\n",
+        "            base_model = base_model.unload() # Reset to base model state\n",
+        "        \n",
+        "        # Load PEFT adapter\n",
+        "        trainer_model = PeftModel.from_pretrained(base_model, adapter_path)\n",
+        "        \n",
+        "        # Ensure 'trainer.model' is globally set so the downstream evaluation cells use it\n",
+        "        if 'trainer' in globals():\n",
+        "            trainer.model = trainer_model\n",
+        "        else:\n",
+        "            # Create a mock trainer class to keep downstream cells running perfectly\n",
+        "            class MockTrainer:\n",
+        "                pass\n",
+        "            trainer = MockTrainer()\n",
+        "            trainer.model = trainer_model\n",
+        "            \n",
+        "        print(\"🎉 SUCCESS! Model successfully wrapped with the pre-trained adapter weights.\")\n",
+        "        print(\"💡 You are now ready to run Step 6 (Evaluation) and Step 7/8 (Exports) directly!\")\n",
+        "    else:\n",
+        "        print(\"❌ Error: 'base_model' is not loaded in memory. Please run Step 1 and Step 3 first!\")\n",
+        "except Exception as e:\n",
+        "    print(f\"❌ Failed to load adapter: {e}\")"
+    ])
+
     # --- CELL 13: Markdown Section 5 (Evaluating Fine-Tuned Model) ---
     add_markdown([
         "## 🔬 Step 6: Evaluating the Fine-Tuned Model",
@@ -720,6 +820,7 @@ def build_notebook():
         "]\n",
         "\n",
         "trainer.model.eval()\n",
+        "trainer.model.config.use_cache = True # Explicitly enable KV Cache during evaluation for fast error-free decoding\n",
         "\n",
         "print(\"\\n============================================================\")\n",
         "print(\"🚀 FINE-TUNED SPECIALIST MODEL INFERENCE RESULTS & ANALYSIS\")\n",
@@ -729,6 +830,7 @@ def build_notebook():
         "    eval_messages = [{\"role\": \"user\", \"content\": pr}]\n",
         "    formatted_prompt = base_tokenizer.apply_chat_template(eval_messages, tokenize=False, add_generation_prompt=True)\n",
         "    inputs = base_tokenizer(formatted_prompt, return_tensors=\"pt\").to(base_model.device)\n",
+        "    inputs.pop(\"token_type_ids\", None) # Remove token_type_ids if present to avoid generation dimension mismatch\n",
         "    with torch.no_grad():\n",
         "        outputs = trainer.model.generate(\n",
         "            **inputs,\n",
@@ -770,9 +872,11 @@ def build_notebook():
         "# Ensure fine-tuned model is in-memory\n",
         "if 'trainer' in globals() and 'base_tokenizer' in globals():\n",
         "    trainer.model.eval()\n",
+        "    trainer.model.config.use_cache = True # Explicitly enable KV Cache during evaluation for fast error-free decoding\n",
         "    eval_messages = [{\"role\": \"user\", \"content\": custom_prompt}]\n",
         "    formatted_prompt = base_tokenizer.apply_chat_template(eval_messages, tokenize=False, add_generation_prompt=True)\n",
         "    inputs = base_tokenizer(formatted_prompt, return_tensors=\"pt\").to(base_model.device)\n",
+        "    inputs.pop(\"token_type_ids\", None) # Remove token_type_ids if present to avoid generation dimension mismatch\n",
         "    \n",
         "    with torch.no_grad():\n",
         "        outputs = trainer.model.generate(\n",
