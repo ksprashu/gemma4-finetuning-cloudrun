@@ -293,9 +293,20 @@
 
         /* Typographic and Structural Articles */
         article {
+            display: none;
             max-width: 1050px;
             margin-bottom: 5rem;
             scroll-margin-top: 4rem;
+        }
+
+        article.active-page {
+            display: block;
+            animation: fadeIn 0.35s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .hero-section {
@@ -897,14 +908,6 @@
                 </li>
             </ul>
 
-            <div class="nav-section-title">Diagnostics</div>
-            <ul class="nav-menu">
-                <li>
-                    <a href="#troubleshooter" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>Troubleshooting Hub</span>
-                    </a>
-                </li>
-            </ul>
         </aside>
 
         <!-- Main Content Panel -->
@@ -920,7 +923,7 @@
             </div>
 
             <!-- INTRODUCTION -->
-            <article id="introduction">
+            <article id="introduction" class="active-page">
                 <div class="hero-section">
                     <span class="book-badge">The Complete Encyclopedia</span>
                     <h1>The Gemma 4 Fine-Tuning &amp; Inference Encyclopedia</h1>
@@ -1856,95 +1859,12 @@ python src/evaluation_check.py</code></pre>
                 </div>
             </article>
 
-            <!-- INTERACTIVE TROUBLESHOOTING HUB -->
-            <article id="troubleshooter">
-                <span class="book-badge">Interactive Terminal Sandbox</span>
-                <h2>Active Troubleshooting Hub &amp; Debugger</h2>
-                <p>Click on any of our six documented production crash types below. The virtual CLI terminal will dynamically simulate the real traceback and reveal the direct code solution.</p>
-
-                <div class="terminal-emulator">
-                    <div class="terminal-header">
-                        <div class="terminal-dot red"></div>
-                        <div class="terminal-dot yellow"></div>
-                        <div class="terminal-dot green"></div>
-                        <span style="color: white; margin-left: auto; font-size: 0.75rem;">Gemma-4-Debugger@primary-node:~</span>
-                    </div>
-
-                    <div class="terminal-tabs">
-                        <button class="terminal-tab-btn active" onclick="loadTraceback(0)">SFTConfig Run Name</button>
-                        <button class="terminal-tab-btn" onclick="loadTraceback(1)">Missing AutoModel</button>
-                        <button class="terminal-tab-btn" onclick="loadTraceback(2)">T4 GPU OOM / Precision</button>
-                        <button class="terminal-tab-btn" onclick="loadTraceback(3)">Token Leaking</button>
-                        <button class="terminal-tab-btn" onclick="loadTraceback(4)">GCS Serialization</button>
-                    </div>
-
-                    <div id="terminal-content">
-                        <!-- Terminal content injected dynamically -->
-                    </div>
-                </div>
-            </article>
-
         </main>
     </div>
 
     <!-- Interactive Scripts logic -->
     <script>
-        // Real tracebacks database for the virtual terminal
-        const tracebacks = [
-            {
-                title: "SFTConfig Run Name Crash",
-                terminal: `[root@Gemma4-train] # python3 train.py
 
-ValueError: run_name 'manual' is a reserved system keyword. SFTConfig initialization failed.
-Traceback (most recent call last):
-  File "train.py", line 42, in <module>
-    config = SFTConfig(run_name="manual", ...)
-
-[DIAGNOSIS]: Hugging Face SFTConfig restricts custom "manual" strings on experiment logs.
-[FIX]: Changed run_name config parameter to "none" inside create_colab_notebook.py.`
-            },
-            {
-                title: "Missing AutoModel NameError",
-                terminal: `[root@Gemma4-train] # python3 step3_load.py
-
-NameError: name 'AutoModelForCausalLM' is not defined
-Traceback (most recent call last):
-  File "step3_load.py", line 18, in <module>
-    model = AutoModelForCausalLM.from_pretrained(...)
-
-[DIAGNOSIS]: Stateless Colab environment kernel timeouts lose previous cell declarations.
-[FIX]: Wrapped explicit, redundant PyTorch and Transformers imports inside Step 3.`
-            },
-            {
-                title: "T4 GPU VRAM OOM / Precision Fallback",
-                terminal: `[root@Gemma4-train] # python3 train.py
-
-PyTorch Runtime Exception: CUDA Out of Memory. Tried to allocate 8.75 GiB (GPU 0; 15.00 GiB total capacity; 11.20 GiB already allocated).
-[OR]
-RuntimeError: bfloat16 is not natively supported on NVIDIA T4 (Turing) architectures.
-
-[DIAGNOSIS]: HF prepare_model_for_kbit_training upcasts all embed layers, bloating Gemma 256K vocabulary memory by 8.75 GiB. SFTConfig bf16=True fails on T4.
-[FIX]: Developed custom_prepare_model_for_kbit_training upcasting ONLY layer norms, saving 8GB VRAM.`
-            },
-            {
-                title: "Token Leaking",
-                terminal: `[root@Gemma4-serve] # curl -X POST localhost:8080/generate -d '{"prompt": "Classify sentiment: Great!"}'
-
-"Output": "Positive<end_of_turn>\n<"
-
-[DIAGNOSIS]: Gemma 4 conversational stop logits leak raw template symbols on short generation targets.
-[FIX]: Implemented clean_prediction splits splitting outputs on first '<' char and stripping whitespaces.`
-            },
-            {
-                title: "GCS Serialization",
-                terminal: `[root@Gemma4-serve] # python3 serve.py
-
-FileNotFoundError: [Errno 2] No such file or directory: 'adapter_config.json' inside ephemeral container storage.
-
-[DIAGNOSIS]: Cloud Run instances are volatile; local file caches erase on container reboots.
-[FIX]: Configured google-cloud-storage direct uploads on train completion and pulled adapters dynamically on FastAPI boot.`
-            }
-        ];
 
         // Run VRAM calculation algorithm
         function calculateVRAM() {
@@ -1997,20 +1917,7 @@ FileNotFoundError: [Errno 2] No such file or directory: 'adapter_config.json' in
             }
         }
 
-        // Load tracebacks in emulator terminal
-        function loadTraceback(index) {
-            const contentArea = document.getElementById('terminal-content');
-            const btns = document.querySelectorAll('.terminal-tab-btn');
-            
-            // Set active button
-            btns.forEach((btn, idx) => {
-                if (idx === index) btn.classList.add('active');
-                else btn.classList.remove('active');
-            });
 
-            // Set terminal text with typing simulation or direct swap
-            contentArea.innerHTML = `<pre style="background: none !important; padding: 0 !important; margin: 0 !important; white-space: pre-wrap !important; word-break: break-word !important;"><code style="color: var(--terminal-text) !important; white-space: pre-wrap !important; word-break: break-word !important;">${tracebacks[index].terminal}</code></pre>`;
-        }
 
         // Quiz checking
         function checkQuizAnswer(element, status, feedbackText) {
@@ -2067,7 +1974,7 @@ FileNotFoundError: [Errno 2] No such file or directory: 'adapter_config.json' in
             });
         }
 
-        // Active Navigation Highlighter
+        // Active Navigation Highlighter (SPA Tab Switcher)
         function setActiveNav(event, element) {
             if (event) event.preventDefault();
             const items = document.querySelectorAll('.nav-item');
@@ -2079,14 +1986,19 @@ FileNotFoundError: [Errno 2] No such file or directory: 'adapter_config.json' in
             document.getElementById('top-breadcrumbs').innerText = `Gemma 4 Fine-Tuning & Serving Encyclopedia > ${label}`;
 
             const targetId = element.getAttribute('href');
+            
+            // Toggle active-page class across articles
+            document.querySelectorAll('main article').forEach(art => {
+                art.classList.remove('active-page');
+            });
+            
             const targetElement = document.querySelector(targetId);
             const mainElement = document.querySelector('main');
-            if (targetElement && mainElement) {
-                const targetOffsetTop = targetElement.getBoundingClientRect().top + mainElement.scrollTop - mainElement.getBoundingClientRect().top;
-                mainElement.scrollTo({
-                    top: targetOffsetTop,
-                    behavior: 'smooth'
-                });
+            if (targetElement) {
+                targetElement.classList.add('active-page');
+                if (mainElement) {
+                    mainElement.scrollTop = 0;
+                }
             }
         }
 
@@ -2276,7 +2188,6 @@ export EVAL_MODE=1  # 1 = Remote Service, 2 = Local PyTorch
         // Initialize on page load
         window.onload = function() {
             calculateVRAM();
-            loadTraceback(0);
             switchGenStep(0);
         };
     </script>
