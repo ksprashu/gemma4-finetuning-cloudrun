@@ -221,6 +221,23 @@ def main():
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right" # Recommended side for training CausalLM
     
+    # Set standard Gemma chat template if not present (essential for training base models on conversational datasets)
+    if tokenizer.chat_template is None:
+        logger.info("Setting standard Gemma chat template on tokenizer.")
+        tokenizer.chat_template = (
+            "{{ bos_token }}"
+            "{% for message in messages %}"
+            "{% if message['role'] == 'user' %}"
+            "{{ '<start_of_turn>user\n' + message['content'] + '<end_of_turn>\n' }}"
+            "{% elif message['role'] == 'model' %}"
+            "{{ '<start_of_turn>model\n' + message['content'] + '<end_of_turn>\n' }}"
+            "{% endif %}"
+            "{% endfor %}"
+            "{% if add_generation_prompt %}"
+            "{{ '<start_of_turn>model\n' }}"
+            "{% endif %}"
+        )
+    
     # 4. LoRA Adapter Configuration
     logger.info("Configuring LoRA...")
     lora_config = LoraConfig(
