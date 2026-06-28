@@ -4,7 +4,7 @@ import logging
 from datasets import load_dataset
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from peft import LoraConfig
 from trl import SFTConfig, SFTTrainer
 
 # Configure logging
@@ -90,6 +90,28 @@ def upload_directory_to_gcs(local_dir, bucket_name, gcs_prefix):
         logger.error("google-cloud-storage not installed. Cannot upload to GCS.")
     except Exception as e:
         logger.error(f"Failed to upload to GCS: {e}")
+def custom_prepare_model_for_kbit_training(model, use_gradient_checkpointing=True, gradient_checkpointing_kwargs=None):
+    """Memory-efficient model preparation for k-bit training on Gemma models.
+    Only upcasts layernorms (norm, ln) to float32 to prevent upcasting embeddings
+    and lm_head, saving ~8.75 GiB of VRAM from being allocated.
+    """
+    for name, param in model.named_parameters():
+        param.requires_grad = False
+    
+    for name, param in model.named_parameters():
+        if ("norm" in name or "ln" in name) and param.__class__.__name__ != "Params4bit":
+            if param.dtype in [torch.float16, torch.bfloat16]:
+                param.data = param.data.to(torch.float32)
+    
+    if use_gradient_checkpointing:
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs=gradient_checkpointing_kwargs)
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+        else:
+            def make_inputs_require_grad(module, input, output):
+                output.requires_grad_(True)
+            model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
+    return model
 
 def main():
     args = parse_args()
@@ -171,7 +193,7 @@ def main():
     )
     
     # Prepare model for k-bit training (e.g. gradient checkpointing setup)
-    model = prepare_model_for_kbit_training(model)
+    model = custom_prepare_model_for_kbit_training(model)
     
     logger.info(f"Loading tokenizer: {args.model_id}")
     tokenizer = AutoTokenizer.from_pretrained(args.model_id)
@@ -201,12 +223,14 @@ def main():
         num_train_epochs=args.num_train_epochs,
         per_device_train_batch_size=args.per_device_train_batch_size,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
+        gradient_checkpointing=True,
+        gradient_checkpointing_kwargs={"use_reentrant": False},
         learning_rate=args.learning_rate,
         weight_decay=args.weight_decay,
         warmup_ratio=args.warmup_ratio,
         logging_steps=args.logging_steps,
         save_strategy="epoch",
-        evaluation_strategy="no",
+        eval_strategy="no",
         fp16=False,
         bf16=True, # Recommended for L4 GPU
         optim="paged_adamw_8bit", # Memory-efficient optimizer for QLoRA
