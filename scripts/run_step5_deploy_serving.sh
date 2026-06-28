@@ -12,6 +12,13 @@ echo -e "${INFO}================================================================
 echo -e "${INFO}🚀 STEP 5: BUILD & DEPLOY INFERENCE SERVICE TO CLOUD RUN${NC}"
 echo -e "${INFO}======================================================================${NC}"
 
+# Determine repo root directory relative to this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Always execute relative to the repository root directory
+cd "${REPO_ROOT}"
+
 # 1. Resolve PROJECT_ID
 if [ -z "$PROJECT_ID" ]; then
     DEFAULT_PROJECT=$(gcloud config get-value project 2>/dev/null || echo "")
@@ -77,7 +84,7 @@ gcloud builds submit --tag "$IMAGE_TAG" \
     --config=<(echo '
 steps:
 - name: "gcr.io/cloud-builders/docker"
-  args: ["build", "-t", "'"$IMAGE_TAG"'", "-f", "Dockerfile.serve", "."]
+  args: ["build", "-t", "'"$IMAGE_TAG"'", "-f", "deploy/Dockerfile.serve", "."]
 images:
 - "'"$IMAGE_TAG"'"
 ') \

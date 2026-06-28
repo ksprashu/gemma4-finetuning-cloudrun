@@ -12,14 +12,18 @@ echo -e "${INFO}================================================================
 echo -e "${INFO}🚀 STEP 2: CREATE GCS BUCKET & UPLOAD DATASET${NC}"
 echo -e "${INFO}======================================================================${NC}"
 
+# Determine repo root directory relative to this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
 # Resolve dataset file path
-OUTPUT_FILE=${OUTPUT_FILE:-"sentiment_dataset.jsonl"}
+OUTPUT_FILE=${OUTPUT_FILE:-"${REPO_ROOT}/sentiment_dataset.jsonl"}
 
 # Check for local dataset file
 if [ ! -f "$OUTPUT_FILE" ]; then
-    echo -e "${YELLOW}⚠️ '$OUTPUT_FILE' not found in workspace root. Running Step 1 dataset generator...${NC}"
+    echo -e "${YELLOW}⚠️ '$OUTPUT_FILE' not found. Running Step 1 dataset generator...${NC}"
     export OUTPUT_FILE="$OUTPUT_FILE"
-    python3 generate_dataset.py
+    python3 "${REPO_ROOT}/src/generate_dataset.py"
 fi
 
 # 1. Resolve PROJECT_ID

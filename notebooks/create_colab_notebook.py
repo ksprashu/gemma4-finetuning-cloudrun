@@ -1206,7 +1206,8 @@ def build_notebook():
     ])
 
     # Save to disk
-    output_path = "/Users/ksprashanth/code/sandbox/gemma4-finetuning/gemma4_colab_finetuning.ipynb"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_path = os.path.join(script_dir, "gemma4_colab_finetuning.ipynb")
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(notebook, f, indent=1)
 

@@ -5,7 +5,9 @@ import sys
 def test_notebook_syntax_and_precision():
     print("--- [Static Check] Starting Notebook Quality & Precision Audit ---")
     
-    notebook_path = "gemma4_colab_finetuning.ipynb"
+    import os
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    notebook_path = os.path.join(script_dir, "../notebooks/gemma4_colab_finetuning.ipynb")
     
     # 1. Verify file existence and valid JSON structure
     try:

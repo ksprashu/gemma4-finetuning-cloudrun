@@ -12,6 +12,10 @@ echo -e "${INFO}================================================================
 echo -e "${INFO}🚀 STEP 4: RUN AN EVALUATION CHECK ON MODEL PRECISION${NC}"
 echo -e "${INFO}======================================================================${NC}"
 
+# Determine repo root directory relative to this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
 echo -e "This script evaluates the sentiment classification precision of your model."
 echo -e "You can evaluate a remote Cloud Run endpoint (highly recommended & fast) or run a local PyTorch model check."
 echo -e "----------------------------------------------------------------------"
@@ -78,7 +82,7 @@ if [ "$EVAL_MODE" = "1" ]; then
     fi
     
     echo -e "${INFO}Evaluating remote service URL: ${SERVICE_URL}...${NC}"
-    python3 evaluation_check.py --url "$SERVICE_URL"
+    python3 "${REPO_ROOT}/src/evaluation_check.py" --url "$SERVICE_URL"
 else
     # Local mode
     if [ -z "$MODEL_ID" ]; then
@@ -98,9 +102,9 @@ else
     echo -e "${INFO}Evaluating local model: ${MODEL_ID}...${NC}"
     if [ -n "$ADAPTER_PATH" ]; then
         echo -e "${INFO}With adapter path: ${ADAPTER_PATH}...${NC}"
-        python3 evaluation_check.py --local --model_id "$MODEL_ID" --adapter_path "$ADAPTER_PATH"
+        python3 "${REPO_ROOT}/src/evaluation_check.py" --local --model_id "$MODEL_ID" --adapter_path "$ADAPTER_PATH"
     else
-        python3 evaluation_check.py --local --model_id "$MODEL_ID"
+        python3 "${REPO_ROOT}/src/evaluation_check.py" --local --model_id "$MODEL_ID"
     fi
 fi
 

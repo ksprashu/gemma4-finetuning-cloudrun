@@ -11,9 +11,13 @@ echo -e "${INFO}================================================================
 echo -e "${INFO}🚀 STEP 1: GENERATE SYNTHETIC SENTIMENT DATASET${NC}"
 echo -e "${INFO}======================================================================${NC}"
 
+# Determine repo root directory relative to this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
 # Configure defaults and inform the user
 DATASET_SIZE=${DATASET_SIZE:-2000}
-OUTPUT_FILE=${OUTPUT_FILE:-"sentiment_dataset.jsonl"}
+OUTPUT_FILE=${OUTPUT_FILE:-"${REPO_ROOT}/sentiment_dataset.jsonl"}
 
 echo -e "${INFO}Configuration:${NC}"
 echo -e " - DATASET_SIZE: ${YELLOW}${DATASET_SIZE}${NC} (Set via DATASET_SIZE env var)"
@@ -24,6 +28,6 @@ echo -e "----------------------------------------------------------------------"
 export DATASET_SIZE="$DATASET_SIZE"
 export OUTPUT_FILE="$OUTPUT_FILE"
 
-python3 generate_dataset.py
+python3 "${REPO_ROOT}/src/generate_dataset.py"
 
 echo -e "\n${GREEN}✅ Step 1 complete! '${OUTPUT_FILE}' has been successfully generated.${NC}"

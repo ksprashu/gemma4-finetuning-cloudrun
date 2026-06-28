@@ -3,6 +3,7 @@ FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PORT=8080
 
 WORKDIR /app
 
@@ -15,8 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy training logic
-COPY train.py .
+# Copy serving logic
+COPY src/serve.py ./serve.py
 
-# Set ENTRYPOINT to python train.py
-ENTRYPOINT ["python", "train.py"]
+# Expose port (Cloud Run will inject this, defaults to 8080)
+EXPOSE 8080
+
+# Set ENTRYPOINT to python serve.py
+ENTRYPOINT ["python", "serve.py"]

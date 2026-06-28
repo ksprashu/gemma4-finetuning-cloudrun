@@ -28,29 +28,29 @@ For maximum ease-of-use and production readiness, we have provided **6 atomic or
 
 | Script | Purpose | Key Environment Variables |
 | :--- | :--- | :--- |
-| [run_step1_generate_dataset.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/run_step1_generate_dataset.sh) | Compiles synthetic dataset. | `DATASET_SIZE` (default: 2000), `OUTPUT_FILE` (default: `sentiment_dataset.jsonl`) |
-| [run_step2_upload_to_gcs.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/run_step2_upload_to_gcs.sh) | Resolves GCP project, creates GCS bucket (if needed) and uploads the dataset. | `PROJECT_ID`, `BUCKET_NAME`, `REGION` (default: `us-central1`), `OUTPUT_FILE` |
-| [run_step3_deploy_training_job.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/run_step3_deploy_training_job.sh) | Enables APIs, secures Hugging Face token in Secret Manager, builds training Docker image, and registers the serverless GPU Cloud Run Job. | `PROJECT_ID`, `BUCKET_NAME`, `REGION`, `HF_TOKEN`, `REPO_NAME` (default: `gemma-4-repo`), `JOB_NAME` (default: `gemma-4-finetune`), `MODEL_ID` (default: `google/gemma-4-E4B-it`), `GCS_PREFIX` (default: `gemma-4-adapters`) |
-| [run_step4_run_evaluation.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/run_step4_run_evaluation.sh) | Runs model precision verification against a remote serving endpoint or locally using PyTorch. | `PROJECT_ID`, `REGION`, `EVAL_MODE` (`1` = Remote, `2` = Local), `SERVICE_NAME` (default: `gemma-4-serve`), `SERVICE_URL`, `MODEL_ID`, `ADAPTER_PATH` |
-| [run_step5_deploy_serving.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/run_step5_deploy_serving.sh) | Builds serving image and deploys the FastAPI server to Cloud Run with GPU, mounting GCS adapters on-the-fly. | `PROJECT_ID`, `BUCKET_NAME`, `REGION`, `REPO_NAME`, `SERVICE_NAME`, `MODEL_ID`, `GCS_PREFIX` |
-| [run_step6_test_inference.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/run_step6_test_inference.sh) | Exercises `/health`, raw prompt `/generate`, and chat completions endpoints using `curl`. | `PROJECT_ID`, `REGION`, `SERVICE_NAME`, `SERVICE_URL` |
+| [run_step1_generate_dataset.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/scripts/run_step1_generate_dataset.sh) | Compiles synthetic dataset. | `DATASET_SIZE` (default: 2000), `OUTPUT_FILE` (default: `sentiment_dataset.jsonl`) |
+| [run_step2_upload_to_gcs.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/scripts/run_step2_upload_to_gcs.sh) | Resolves GCP project, creates GCS bucket (if needed) and uploads the dataset. | `PROJECT_ID`, `BUCKET_NAME`, `REGION` (default: `us-central1`), `OUTPUT_FILE` |
+| [run_step3_deploy_training_job.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/scripts/run_step3_deploy_training_job.sh) | Enables APIs, secures Hugging Face token in Secret Manager, builds training Docker image, and registers the serverless GPU Cloud Run Job. | `PROJECT_ID`, `BUCKET_NAME`, `REGION`, `HF_TOKEN`, `REPO_NAME` (default: `gemma-4-repo`), `JOB_NAME` (default: `gemma-4-finetune`), `MODEL_ID` (default: `google/gemma-4-E4B-it`), `GCS_PREFIX` (default: `gemma-4-adapters`) |
+| [run_step4_run_evaluation.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/scripts/run_step4_run_evaluation.sh) | Runs model precision verification against a remote serving endpoint or locally using PyTorch. | `PROJECT_ID`, `REGION`, `EVAL_MODE` (`1` = Remote, `2` = Local), `SERVICE_NAME` (default: `gemma-4-serve`), `SERVICE_URL`, `MODEL_ID`, `ADAPTER_PATH` |
+| [run_step5_deploy_serving.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/scripts/run_step5_deploy_serving.sh) | Builds serving image and deploys the FastAPI server to Cloud Run with GPU, mounting GCS adapters on-the-fly. | `PROJECT_ID`, `BUCKET_NAME`, `REGION`, `REPO_NAME`, `SERVICE_NAME`, `MODEL_ID`, `GCS_PREFIX` |
+| [run_step6_test_inference.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/scripts/run_step6_test_inference.sh) | Exercises `/health`, raw prompt `/generate`, and chat completions endpoints using `curl`. | `PROJECT_ID`, `REGION`, `SERVICE_NAME`, `SERVICE_URL` |
 
 ### How to Run the Pipeline (Zero Configuration Example)
 If you have configured your local terminal via `gcloud config set project YOUR_PROJECT_ID`, you can run the entire pipeline interactively with zero manual environment configuration. The scripts will automatically resolve your active project and walk you through deployment options:
 
 ```bash
 # Ensure scripts have execute permissions
-chmod +x run_step*.sh
+chmod +x scripts/run_step*.sh
 
 # 1. Generate local dataset
-./run_step1_generate_dataset.sh
+./scripts/run_step1_generate_dataset.sh
 
 # 2. Upload to GCS
-./run_step2_upload_to_gcs.sh
+./scripts/run_step2_upload_to_gcs.sh
 
 # 3. Build & register Cloud Run GPU training job
 export HF_TOKEN="your_huggingface_read_token"
-./run_step3_deploy_training_job.sh
+./scripts/run_step3_deploy_training_job.sh
 
 # 4. Trigger the training job (printed at end of Step 3)
 gcloud run jobs execute gemma-4-finetune --region=us-central1
@@ -58,13 +58,13 @@ gcloud run jobs execute gemma-4-finetune --region=us-central1
 # [Wait for Job completion in GCP Console]
 
 # 5. Build & deploy serving API to Cloud Run
-./run_step5_deploy_serving.sh
+./scripts/run_step5_deploy_serving.sh
 
 # 6. Test inference against deployed service URL
-./run_step6_test_inference.sh
+./scripts/run_step6_test_inference.sh
 
 # 7. Run evaluation audit
-./run_step4_run_evaluation.sh
+./scripts/run_step4_run_evaluation.sh
 ```
 
 ### Headless & CI/CD Automation Example
@@ -77,22 +77,22 @@ export REGION="us-central1"
 export HF_TOKEN="hf_xxxxxxxxxxxx"
 export DATASET_SIZE="2000"
 
-./run_step1_generate_dataset.sh
-./run_step2_upload_to_gcs.sh
-./run_step3_deploy_training_job.sh
+./scripts/run_step1_generate_dataset.sh
+./scripts/run_step2_upload_to_gcs.sh
+./scripts/run_step3_deploy_training_job.sh
 
 # Run training
 gcloud run jobs execute gemma-4-finetune --region=$REGION --project=$PROJECT_ID
 
 # Deploy serving
-./run_step5_deploy_serving.sh
+./scripts/run_step5_deploy_serving.sh
 
 # Test and evaluate remote service url
 export SERVICE_URL=$(gcloud run services describe gemma-4-serve --format="value(status.url)" --region=$REGION --project=$PROJECT_ID)
-./run_step6_test_inference.sh
+./scripts/run_step6_test_inference.sh
 
 export EVAL_MODE=1
-./run_step4_run_evaluation.sh
+./scripts/run_step4_run_evaluation.sh
 ```
 
 ---
@@ -101,20 +101,43 @@ export EVAL_MODE=1
 
 ```
 /Users/ksprashanth/code/sandbox/gemma4-finetuning/
-├── train.py                  # Fine-tuning script supporting QLoRA & GCS integration
-├── serve.py                  # FastAPI inference server with dynamic GCS adapter loading
-├── generate_dataset.py       # Programmatic generator for nuanced sentiment analysis data
-├── evaluation_check.py       # Core evaluation script for remote or local model precision checks
-├── requirements.txt          # Shared Python dependencies
-├── Dockerfile.train          # Container specification for Cloud Run Job (Fine-tuning)
-├── Dockerfile.serve          # Container specification for Cloud Run Service (Inference)
-├── job.yaml                  # Declarative spec for Cloud Run Job
-├── service.yaml              # Declarative spec for Cloud Run Service
-├── test_client.py            # CLI test client for raw and chat completion endpoints
-├── test_notebook_precision.py # Static and syntax validation suite for the Colab notebook
-├── create_colab_notebook.py  # Script to compile the companion Jupyter notebook
-├── gemma4_colab_finetuning.ipynb # Interactive, OOM-safe companion notebook for Colab testing
-└── README.md                 # This comprehensive architecture & operational guide
+├── requirements.txt            # Shared Python dependencies
+├── README.md                   # This comprehensive operational guide
+├── gemma_finetuning_workflow.png # End-to-end pipeline infographic
+│
+├── deploy/                     # Deployment configurations for GCP
+│   ├── Dockerfile.serve        # Serving Dockerfile (Inference)
+│   ├── Dockerfile.train        # Training Dockerfile (Fine-tuning)
+│   ├── job.yaml                # Declarative Cloud Run Job spec
+│   └── service.yaml            # Declarative Cloud Run Service spec
+│
+├── notebooks/                  # Interactive companion notebooks
+│   ├── create_colab_notebook.py # Compiler script for Colab notebook
+│   └── gemma4_colab_finetuning.ipynb # Interactive, OOM-safe Colab notebook
+│
+├── scripts/                    # Portable orchestration shell scripts
+│   ├── run_step1_generate_dataset.sh
+│   ├── run_step2_upload_to_gcs.sh
+│   ├── run_step3_deploy_training_job.sh
+│   ├── run_step4_run_evaluation.sh
+│   ├── run_step5_deploy_serving.sh
+│   └── run_step6_test_inference.sh
+│
+├── src/                        # Main Python source codebase
+│   ├── evaluation_check.py     # Evaluation and precision verify logic
+│   ├── generate_dataset.py     # Synthetic dataset generator
+│   ├── serve.py                # FastAPI inference serving app
+│   ├── test_client.py          # OpenAI-compatible test client
+│   ├── test_notebook_precision.py # Notebook static checking tool
+│   └── train.py                # QLoRA fine-tuning training entrypoint
+│
+└── knowledgebase/              # Extensive developer knowledge base
+    ├── 1_runtimes.md           # Model runtimes comparison guide
+    ├── 2_quantization.md       # Quantization formats comparison
+    ├── 3_finetuning.md         # Fine-tuning and PEFT guide
+    ├── 4_evaluation.md         # LLM evaluation methodologies
+    ├── 5_our_lessons.md        # Technical retrospective & OOM guides
+    └── index.html              # HTML dashboard for knowledge base
 ```
 
 ---
@@ -126,7 +149,7 @@ export EVAL_MODE=1
 ```mermaid
 flowchart TD
     subgraph "Data Preparation"
-        Gen[generate_dataset.py] -->|Generates 2k Nuanced Samples| LocalDS[sentiment_dataset.jsonl]
+        Gen[src/generate_dataset.py] -->|Generates 2k Nuanced Samples| LocalDS[sentiment_dataset.jsonl]
         LocalDS -->|Upload to Bucket| GCS_DS[(gs://your-bucket/datasets/)]
     end
     
@@ -365,7 +388,7 @@ Our `train.py` script automatically recognizes `gs://` paths. When the Cloud Run
 
 ### Option A: Deploying via Declarative YAML (Recommended)
 
-1. Open [job.yaml](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/job.yaml) and configure the environment variables:
+1. Open [job.yaml](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/deploy/job.yaml) and configure the environment variables:
    - Replace `YOUR_PROJECT_ID` in the container image field.
    - Enter your actual `HF_TOKEN` (or use Secret Manager reference).
    - Point your dataset and storage args:
@@ -383,7 +406,7 @@ Our `train.py` script automatically recognizes `gs://` paths. When the Cloud Run
 2. Deploy and run (substituting your local shell $PROJECT_ID and $HF_TOKEN env vars):
    ```bash
    # Dynamically populate and replace the Cloud Run Job definition
-   envsubst < job.yaml | gcloud run jobs replace -
+   envsubst < deploy/job.yaml | gcloud run jobs replace -
    
    # Trigger the job execution in us-central1
    gcloud run jobs execute gemma-4-finetune --region=us-central1
@@ -435,7 +458,7 @@ When the FastAPI app boots:
 
 ### Option A: Deploying via Declarative YAML (Recommended)
 
-1. Configure [service.yaml](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/service.yaml):
+1. Configure [service.yaml](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/deploy/service.yaml):
    - Replace image with your serving repository URL.
    - Point the `LORA_ADAPTER_PATH` environment variable:
      ```yaml
@@ -445,7 +468,7 @@ When the FastAPI app boots:
 2. Deploy the service (substituting your local shell $PROJECT_ID and $HF_TOKEN env vars):
    ```bash
    # Dynamically populate and deploy the serving definition
-   envsubst < service.yaml | gcloud run services replace -
+   envsubst < deploy/service.yaml | gcloud run services replace -
    ```
 
 ### Option B: Deploying directly via gcloud CLI Flags (Imperative)
@@ -513,8 +536,8 @@ To prevent this, the notebook has been engineered with strict **VRAM Lifecycle M
 4. **Optimized SFTConfig:** The training configuration uses `gradient_checkpointing=True` and `per_device_train_batch_size=2` (with `gradient_accumulation_steps=8` to maintain an effective batch size of 16). This keeps active memory utilization during backward passes extremely low, comfortably within the T4's 15GB VRAM limit.
 
 ### 🛠️ Compiling or Updating the Notebook
-If you want to modify the notebook's structure or add cell contents, edit the compiler script `create_colab_notebook.py` and run:
+If you want to modify the notebook's structure or add cell contents, edit the compiler script `notebooks/create_colab_notebook.py` and run:
 ```bash
-python create_colab_notebook.py
+python3 notebooks/create_colab_notebook.py
 ```
 This will compile a brand new `gemma4_colab_finetuning.ipynb` file from scratch, maintaining structural formatting and Colab Form field schemas.
