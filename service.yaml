@@ -1,0 +1,57 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: gemma-4-serve
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        # Mandatory for GPUs: disable zonal redundancy
+        run.googleapis.com/gpu-zonal-redundancy-disabled: 'true'
+        # Highly recommended for GPUs: disable CPU throttling to ensure GPU performance
+        run.googleapis.com/cpu-throttling: 'false'
+        # Allocate exactly 1 instance to prevent auto-scaling down to 0 (which causes extreme cold starts)
+        autoscaling.knative.dev/minScale: '1'
+        autoscaling.knative.dev/maxScale: '5'
+    spec:
+      containerConcurrency: 10 # Adjust based on your concurrency capabilities (10 is safe for 4-bit Gemma 4)
+      containers:
+      - image: us-central1-docker.pkg.dev/${PROJECT_ID}/gemma-4-repo/gemma-4-serve:latest
+        resources:
+          limits:
+            cpu: '8'                # Recommended minimum for L4 is 4, 8 is optimal
+            memory: '32Gi'          # Recommended minimum for L4 is 16Gi, 32Gi is optimal
+            nvidia.com/gpu: '1'     # Attach 1 GPU (max 1 is supported)
+        env:
+        - name: HF_TOKEN
+          value: "${HF_TOKEN}"
+        
+        # Base Model ID to run (e.g. google/gemma-4-E4B-it, google/gemma-4-E4B)
+        - name: MODEL_ID
+          value: "google/gemma-4-E4B-it"
+        
+        # LoRA Adapter Path (can be local or gs:// GCS path!)
+        # - name: LORA_ADAPTER_PATH
+        #   value: "gs://YOUR_GCS_BUCKET_NAME/gemma-4-adapters"
+        
+        ports:
+        - containerPort: 8080
+        
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 120 # Give up to 2 minutes for model weights download and GPU initialization
+          periodSeconds: 10
+          failureThreshold: 15
+          
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          periodSeconds: 20
+          
+      nodeSelector:
+        run.googleapis.com/accelerator: nvidia-l4
