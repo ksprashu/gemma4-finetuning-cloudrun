@@ -865,10 +865,21 @@ def build_notebook():
     # --- CELL 12.6.4: Option 4 (Browser Download Zip) ---
     add_markdown([
         "#### 📥 Option 4: Download directly to your local computer (No accounts required)",
-        "If you want to keep a local copy of your fine-tuned weights without setting up cloud buckets or online registries, this block will compress your adapter folder into a `.zip` archive and trigger a direct browser download."
+        "If you want to keep a local copy of your fine-tuned weights without setting up cloud buckets or online registries, this block will compress your adapter folder into a `.zip` archive and trigger a direct browser download.",
+        "",
+        "**💡 Why is the archive ~95 MB?**",
+        "Many beginners are surprised that a LoRA adapter is 95 MB. Here is the exact breakdown:",
+        "1. **LoRA Adapter Weights** (`adapter_model.safetensors` - **~62.7 MB**): Hugging Face saves trainable parameters in standard Single-Precision Float (`float32`, 4 bytes/parameter) by default to prevent precision degradation. With ~15 million trainable parameters, this takes exactly `15M * 4 bytes ≈ 60 MB`.",
+        "2. **Tokenizer Vocabulary** (`tokenizer.json` - **~32.2 MB**): Gemma 4 uses an ultra-large, modern vocabulary of 256,000 tokens. Saving the tokenizer writes this entire vocabulary index alongside your weights so that the adapter remains fully self-contained.",
+        "",
+        "**Choose your download mode below:**",
+        "- **Full Deployment Package** (~95 MB): Includes the adapter weights and the tokenizer. Use this if you plan to upload to the Hugging Face Hub or load it on a system without internet access.",
+        "- **Slim Weights-Only Package** (~60 MB): Excludes the tokenizer. Because our reloading cell (Part B) already pulls the base Gemma 4 tokenizer from Hugging Face, you do *not* need to backup the tokenizer to reload your weights locally! This saves bandwidth and disk space."
     ])
     add_code([
         "#@title 📥 Option 4: Download Adapter as .zip { run: \"none\" }\n",
+        "DOWNLOAD_MODE = \"Full Deployment Package (~95MB)\" #@param [\"Full Deployment Package (~95MB)\", \"Slim Weights-Only (~60MB)\"]\n",
+        "\n",
         "import os\n",
         "import zipfile\n",
         "from google.colab import files\n",
@@ -876,11 +887,15 @@ def build_notebook():
         "zip_path = \"./fine_tuned_gemma_adapter.zip\"\n",
         "adapter_dir = \"./fine_tuned_gemma_adapter\"\n",
         "\n",
-        "print(\"⏳ Compressing fine-tuned adapter folder...\")\n",
+        "print(f\"⏳ Compressing fine-tuned adapter folder using mode: {DOWNLOAD_MODE}...\")\n",
         "with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:\n",
         "    for root, dirs, files_in_dir in os.walk(adapter_dir):\n",
         "        for file in files_in_dir:\n",
         "            file_path = os.path.join(root, file)\n",
+        "            # If slim mode, skip the large tokenizer.json vocabulary file\n",
+        "            if DOWNLOAD_MODE == \"Slim Weights-Only (~60MB)\" and file == \"tokenizer.json\":\n",
+        "                print(\"   Skipping 'tokenizer.json' to keep download slim...\")\n",
+        "                continue\n",
         "            # Maintain relative path inside zip\n",
         "            arcname = os.path.relpath(file_path, os.path.dirname(adapter_dir))\n",
         "            zipf.write(file_path, arcname)\n",
