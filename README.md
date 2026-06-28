@@ -17,6 +17,8 @@ This repository contains a production-grade, end-to-end framework for fine-tunin
 ├── job.yaml                  # Declarative spec for Cloud Run Job
 ├── service.yaml              # Declarative spec for Cloud Run Service
 ├── test_client.py            # CLI test client for raw and chat completion endpoints
+├── create_colab_notebook.py  # Script to compile the companion Jupyter notebook
+├── gemma4_colab_finetuning.ipynb # Interactive, OOM-safe companion notebook for Colab testing
 └── README.md                 # This comprehensive architecture & operational guide
 ```
 
@@ -395,3 +397,27 @@ curl -X POST "https://gemma-4-serve-xxxxxx.a.run.app/v1/chat/completions" \
      }'
 ```
 *(This returns an OpenAI-compatible JSON choice block, making it a drop-in replacement for downstream GPT-compatible client applications.)*
+
+---
+
+## 🎓 Google Colab Companion Notebook (For Free GPU Testing)
+
+For developers who do not have immediate access to Google Cloud Run or prefer to prototype entirely in their browser, we have provided an interactive, self-contained companion notebook: **`gemma4_colab_finetuning.ipynb`**.
+
+You can upload this `.ipynb` file directly to [Google Colab](https://colab.research.google.com/) and run it on a free-tier **NVIDIA T4 GPU**.
+
+### ⚡ Critical VRAM & OOM Protections
+Training and testing a 2-billion parameter model on a single free T4 GPU (which has only 15GB of VRAM) requires meticulous memory orchestration. Running multiple inference steps and a full SFT training loop can easily lead to frustrating PyTorch CUDA Out-Of-Memory (OOM) crashes.
+
+To prevent this, the notebook has been engineered with strict **VRAM Lifecycle Management**:
+1. **Isolated Testing:** The **Instruction-Tuned (IT)** model is loaded, tested, and then **completely deleted from memory** (utilizing `del`, Python `gc.collect()`, and `torch.cuda.empty_cache()`) before loading the next step.
+2. **Unaligned Base Model Contrast:** The **Base Model** is loaded, verified as a pure autocompletion engine in an interactive playground, and then **similarly purged from GPU memory**.
+3. **Fresh Model Loading during Fine-Tuning:** Rather than leaving the base model in memory after inference, the notebook completely frees it and then **reloads it fresh in 4-bit precision** right inside the QLoRA cell, initializing a pristine memory space for SFTTrainer's gradients and optimizer states.
+4. **Interactive Playgrounds:** Every evaluation step includes interactive playfields allowing users to type custom reviews and observe outputs without having to re-initialize or reload model weights.
+
+### 🛠️ Compiling or Updating the Notebook
+If you want to modify the notebook's structure or add cell contents, edit the compiler script `create_colab_notebook.py` and run:
+```bash
+python create_colab_notebook.py
+```
+This will compile a brand new `gemma4_colab_finetuning.ipynb` file from scratch, maintaining structural formatting and Colab Form field schemas.

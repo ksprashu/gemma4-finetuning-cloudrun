@@ -314,6 +314,25 @@ def build_notebook():
         "    print(\"⚠️ Error: The Base model has not been loaded yet, or was removed. Please run the Base model loading cell above.\")"
     ])
 
+    # --- CELL 8.6: Clean up Base model to avoid OOM ---
+    add_markdown([
+        "### 🧹 Freeing VRAM Memory Before Training",
+        "To avoid running out of memory during fine-tuning, we must delete our Step 3 inference base model and clear PyTorch's cache. This ensures the GPU has maximum free VRAM for gradient updates and optimizer states during training."
+    ])
+
+    add_code([
+        "import gc\n",
+        "import torch\n",
+        "try:\n",
+        "    del base_model\n",
+        "    del inputs\n",
+        "except NameError:\n",
+        "    pass\n",
+        "gc.collect()\n",
+        "torch.cuda.empty_cache()\n",
+        "print(\"🧹 VRAM memory cleared and ready for fine-tuning!\")"
+    ])
+
     # --- CELL 9: Markdown Section 3 (Dataset Synthesis) ---
     add_markdown([
         "## 📊 Step 4: Programmatic & Agentic Dataset Synthesis",
@@ -449,7 +468,9 @@ def build_notebook():
 
     # --- CELL 12: Training Execution block ---
     add_code([
+        "import torch\n",
         "from datasets import load_dataset\n",
+        "from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig\n",
         "from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training\n",
         "from trl import SFTConfig, SFTTrainer\n",
         "\n",
@@ -457,12 +478,29 @@ def build_notebook():
         "dataset = load_dataset(\"json\", data_files=dataset_path, split=\"train\")\n",
         "print(f\"Dataset Loaded. Record Count: {len(dataset)}\")\n",
         "\n",
-        "# 2. Prepare base model for k-bit training (handles gradient checkpointing)\n",
+        "# 2. Reload Base Model & Tokenizer Fresh for Fine-Tuning\n",
+        "base_model_id = \"google/gemma-4-E2B\"\n",
+        "print(f\"⏳ Loading fresh base model '{base_model_id}' in 4-bit...\")\n",
+        "bnb_config = BitsAndBytesConfig(\n",
+        "    load_in_4bit=True,\n",
+        "    bnb_4bit_quant_type=\"nf4\",\n",
+        "    bnb_4bit_compute_dtype=torch.float16, # Use float16 for T4 compatibility\n",
+        "    bnb_4bit_use_double_quant=True\n",
+        ")\n",
+        "base_model = AutoModelForCausalLM.from_pretrained(\n",
+        "    base_model_id,\n",
+        "    quantization_config=bnb_config,\n",
+        "    device_map=\"auto\"\n",
+        ")\n",
+        "base_tokenizer = AutoTokenizer.from_pretrained(base_model_id)\n",
+        "print(\"✅ Fresh Base model loaded successfully!\")\n",
+        "\n",
+        "# 3. Prepare base model for k-bit training (handles gradient checkpointing)\n",
         "base_model = prepare_model_for_kbit_training(base_model)\n",
         "base_tokenizer.pad_token = base_tokenizer.eos_token\n",
         "base_tokenizer.padding_side = \"right\"\n",
         "\n",
-        "# 3. Configure LoRA parameters\n",
+        "# 4. Configure LoRA parameters\n",
         "lora_config = LoraConfig(\n",
         "    r=16,\n",
         "    lora_alpha=32,\n",
@@ -472,7 +510,7 @@ def build_notebook():
         "    task_type=\"CAUSAL_LM\"\n",
         ")\n",
         "\n",
-        "# 4. Define modern TRL SFT Training Parameters\n",
+        "# 5. Define modern TRL SFT Training Parameters\n",
         "output_dir = \"./results\"\n",
         "training_args = SFTConfig(\n",
         "    output_dir=output_dir,\n",
@@ -489,7 +527,7 @@ def build_notebook():
         "    report_to=\"none\"\n",
         ")\n",
         "\n",
-        "# 5. Initialize SFTTrainer\n",
+        "# 6. Initialize SFTTrainer\n",
         "trainer = SFTTrainer(\n",
         "    model=base_model,\n",
         "    train_dataset=dataset,\n",
@@ -498,12 +536,12 @@ def build_notebook():
         "    args=training_args\n",
         ")\n",
         "\n",
-        "# 6. Execute Fine-Tuning!\n",
+        "# 7. Execute Fine-Tuning!\n",
         "print(\"⏳ Starting QLoRA fine-tuning...\")\n",
         "trainer.train()\n",
         "print(\"✅ Fine-Tuning complete!\")\n",
         "\n",
-        "# 7. Save Adapter locally\n",
+        "# 8. Save Adapter locally\n",
         "adapter_dir = \"./fine_tuned_gemma_adapter\"\n",
         "trainer.model.save_pretrained(adapter_dir)\n",
         "base_tokenizer.save_pretrained(adapter_dir)\n",
