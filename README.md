@@ -14,6 +14,89 @@ This production pipeline consists of 6 integrated stages to run serverless fine-
 
 ---
 
+## ⚡ Quick Start: Portable Orchestration Scripts
+
+For maximum ease-of-use and production readiness, we have provided **6 atomic orchestration shell scripts** that automate every phase of the pipeline. 
+
+### Key Portability Features
+* **Zero Hardcoding**: Absolutely no Project IDs, Bucket Names, or paths are hardcoded.
+* **Environment Variable Support**: Every script prioritizes standard environment variables.
+* **Non-Interactive & CI/CD Ready**: Scripts check if a terminal is attached (`[ -t 0 ]`). If no terminal is attached, or if variables are pre-configured, they run headlessly without any blocking prompts.
+* **Interactive Prompts with Intelligent Fallbacks**: When run interactively, they query the active `gcloud` configuration to suggest smart defaults, allowing you to just press `Enter` to proceed.
+
+### Summary of Orchestration Scripts
+
+| Script | Purpose | Key Environment Variables |
+| :--- | :--- | :--- |
+| [run_step1_generate_dataset.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/run_step1_generate_dataset.sh) | Compiles synthetic dataset. | `DATASET_SIZE` (default: 2000), `OUTPUT_FILE` (default: `sentiment_dataset.jsonl`) |
+| [run_step2_upload_to_gcs.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/run_step2_upload_to_gcs.sh) | Resolves GCP project, creates GCS bucket (if needed) and uploads the dataset. | `PROJECT_ID`, `BUCKET_NAME`, `REGION` (default: `us-central1`), `OUTPUT_FILE` |
+| [run_step3_deploy_training_job.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/run_step3_deploy_training_job.sh) | Enables APIs, secures Hugging Face token in Secret Manager, builds training Docker image, and registers the serverless GPU Cloud Run Job. | `PROJECT_ID`, `BUCKET_NAME`, `REGION`, `HF_TOKEN`, `REPO_NAME` (default: `gemma-4-repo`), `JOB_NAME` (default: `gemma-4-finetune`), `MODEL_ID` (default: `google/gemma-4-E4B-it`), `GCS_PREFIX` (default: `gemma-4-adapters`) |
+| [run_step4_run_evaluation.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/run_step4_run_evaluation.sh) | Runs model precision verification against a remote serving endpoint or locally using PyTorch. | `PROJECT_ID`, `REGION`, `EVAL_MODE` (`1` = Remote, `2` = Local), `SERVICE_NAME` (default: `gemma-4-serve`), `SERVICE_URL`, `MODEL_ID`, `ADAPTER_PATH` |
+| [run_step5_deploy_serving.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/run_step5_deploy_serving.sh) | Builds serving image and deploys the FastAPI server to Cloud Run with GPU, mounting GCS adapters on-the-fly. | `PROJECT_ID`, `BUCKET_NAME`, `REGION`, `REPO_NAME`, `SERVICE_NAME`, `MODEL_ID`, `GCS_PREFIX` |
+| [run_step6_test_inference.sh](file:///Users/ksprashanth/code/sandbox/gemma4-finetuning/run_step6_test_inference.sh) | Exercises `/health`, raw prompt `/generate`, and chat completions endpoints using `curl`. | `PROJECT_ID`, `REGION`, `SERVICE_NAME`, `SERVICE_URL` |
+
+### How to Run the Pipeline (Zero Configuration Example)
+If you have configured your local terminal via `gcloud config set project YOUR_PROJECT_ID`, you can run the entire pipeline interactively with zero manual environment configuration. The scripts will automatically resolve your active project and walk you through deployment options:
+
+```bash
+# Ensure scripts have execute permissions
+chmod +x run_step*.sh
+
+# 1. Generate local dataset
+./run_step1_generate_dataset.sh
+
+# 2. Upload to GCS
+./run_step2_upload_to_gcs.sh
+
+# 3. Build & register Cloud Run GPU training job
+export HF_TOKEN="your_huggingface_read_token"
+./run_step3_deploy_training_job.sh
+
+# 4. Trigger the training job (printed at end of Step 3)
+gcloud run jobs execute gemma-4-finetune --region=us-central1
+
+# [Wait for Job completion in GCP Console]
+
+# 5. Build & deploy serving API to Cloud Run
+./run_step5_deploy_serving.sh
+
+# 6. Test inference against deployed service URL
+./run_step6_test_inference.sh
+
+# 7. Run evaluation audit
+./run_step4_run_evaluation.sh
+```
+
+### Headless & CI/CD Automation Example
+In a headless server, continuous integration pipeline (like GitHub Actions, Cloud Build, or GitLab CI), or to run scripts non-interactively, simply export the variables beforehand:
+
+```bash
+export PROJECT_ID="my-enterprise-project"
+export BUCKET_NAME="my-gemma4-weights-bucket"
+export REGION="us-central1"
+export HF_TOKEN="hf_xxxxxxxxxxxx"
+export DATASET_SIZE="2000"
+
+./run_step1_generate_dataset.sh
+./run_step2_upload_to_gcs.sh
+./run_step3_deploy_training_job.sh
+
+# Run training
+gcloud run jobs execute gemma-4-finetune --region=$REGION --project=$PROJECT_ID
+
+# Deploy serving
+./run_step5_deploy_serving.sh
+
+# Test and evaluate remote service url
+export SERVICE_URL=$(gcloud run services describe gemma-4-serve --format="value(status.url)" --region=$REGION --project=$PROJECT_ID)
+./run_step6_test_inference.sh
+
+export EVAL_MODE=1
+./run_step4_run_evaluation.sh
+```
+
+---
+
 ## 🏗️ Project Architecture & Components
 
 ```
