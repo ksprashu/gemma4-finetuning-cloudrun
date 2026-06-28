@@ -295,7 +295,19 @@ def build_notebook():
 
     # --- CELL 8: Loading & running Base model ---
     add_code([
+        "import torch\n",
+        "from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig\n",
+        "\n",
         "base_model_id = \"google/gemma-4-E2B\"\n",
+        "\n",
+        "# Ensure 4-bit quantization config is defined (e.g., if Step 2 was skipped during a reload)\n",
+        "if 'bnb_config' not in globals():\n",
+        "    bnb_config = BitsAndBytesConfig(\n",
+        "        load_in_4bit=True,\n",
+        "        bnb_4bit_quant_type=\"nf4\",\n",
+        "        bnb_4bit_compute_dtype=torch.float16,\n",
+        "        bnb_4bit_use_double_quant=True\n",
+        "    )\n",
         "\n",
         "print(f\"⏳ Loading base model '{base_model_id}' in 4-bit...\")\n",
         "base_model = AutoModelForCausalLM.from_pretrained(\n",
@@ -912,9 +924,10 @@ def build_notebook():
         "If you have already trained your model and saved your adapter using one of the methods above, you **do not need to run Step 5 (the training loop) again!**",
         "",
         "When returning to this notebook in a fresh session next time:",
-        "1. Run **Step 1** (to import dependencies).",
-        "2. Run **Step 3** (to load the base model).",
-        "3. Run this interactive form cell below. Select your **LOAD_SOURCE**, configure the variables, and click **Run**. This will pull your weights in seconds and instantly configure your model for inference!"
+        "1. Run the **Installation cell** at the very top of the notebook to install necessary packages.",
+        "2. Run **Step 1** (Hugging Face Authentication) to load your credentials and log in.",
+        "3. Run **Step 3** (Testing the Base Model) to load the raw base model `google/gemma-4-E2B` in 4-bit quantization. *(Note: You can completely skip Step 2 to save time and VRAM!)*",
+        "4. Run this interactive form cell below. Select your **LOAD_SOURCE**, configure the variables, and click **Run**. This will pull your weights in seconds and instantly configure your model for inference!"
     ])
 
     # --- CELL 12.8: Consolidated Restoration Block ---
