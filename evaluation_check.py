@@ -192,7 +192,7 @@ def run_local_evaluation(model_id, adapter_path):
         model = base_model
         
     model.eval()
-    model.config.use_cache = False # Disable cache for dimension safety
+    model.config.use_cache = True # Enable KV cache for stable and fast generation
     
     if tokenizer.chat_template is None:
         tokenizer.chat_template = (

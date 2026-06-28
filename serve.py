@@ -201,8 +201,8 @@ def startup_event():
     else:
         model = base_model
         
-    # Disable cache to prevent PyTorch dimension mismatch bugs during inference
-    model.config.use_cache = False
+    # Enable KV cache to prevent Gemma dimension mismatch errors during generation
+    model.config.use_cache = True
         
     # Set standard Gemma chat template if not present (essential for handling conversational queries)
     if tokenizer.chat_template is None:
