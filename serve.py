@@ -142,6 +142,19 @@ def startup_event():
         torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
     )
     
+    # Unwrap Gemma4ClippableLinear modules if present to prevent PEFT/LoRA errors
+    unwrapped_count = 0
+    for name, module in list(base_model.named_modules()):
+        if module.__class__.__name__ == "Gemma4ClippableLinear":
+            parts = name.split(".")
+            parent = base_model
+            for part in parts[:-1]:
+                parent = getattr(parent, part)
+            setattr(parent, parts[-1], module.linear)
+            unwrapped_count += 1
+    if unwrapped_count > 0:
+        logger.info(f"Successfully unwrapped {unwrapped_count} Gemma4ClippableLinear modules.")
+    
     # Load LoRA adapter if specified
     if lora_path:
         local_adapter_dir = lora_path

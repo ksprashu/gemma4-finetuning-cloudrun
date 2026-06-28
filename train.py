@@ -64,6 +64,14 @@ def parse_args():
         help="GCS prefix directory under the bucket to store weights"
     )
     
+    # Hugging Face Hub Integration
+    parser.add_argument(
+        "--hub_model_id",
+        type=str,
+        default=None,
+        help="Optional: Hugging Face repository ID (e.g. 'username/gemma-4-sentiment-adapter') to push fine-tuned adapter weights"
+    )
+    
     return parser.parse_args()
 
 def upload_directory_to_gcs(local_dir, bucket_name, gcs_prefix):
@@ -192,6 +200,19 @@ def main():
         device_map="auto",
     )
     
+    # Unwrap Gemma4ClippableLinear modules if present to prevent PEFT/LoRA errors
+    unwrapped_count = 0
+    for name, module in list(model.named_modules()):
+        if module.__class__.__name__ == "Gemma4ClippableLinear":
+            parts = name.split(".")
+            parent = model
+            for part in parts[:-1]:
+                parent = getattr(parent, part)
+            setattr(parent, parts[-1], module.linear)
+            unwrapped_count += 1
+    if unwrapped_count > 0:
+        logger.info(f"Successfully unwrapped {unwrapped_count} Gemma4ClippableLinear modules.")
+    
     # Prepare model for k-bit training (e.g. gradient checkpointing setup)
     model = custom_prepare_model_for_kbit_training(model)
     
@@ -262,6 +283,16 @@ def main():
     # 8. Upload to Google Cloud Storage (if specified)
     if args.gcs_bucket:
         upload_directory_to_gcs(args.output_dir, args.gcs_bucket, args.gcs_prefix)
+        
+    # 9. Push to Hugging Face Hub (if specified)
+    if args.hub_model_id:
+        logger.info(f"Pushing adapter weights and tokenizer to Hugging Face Hub: {args.hub_model_id}")
+        try:
+            trainer.model.push_to_hub(args.hub_model_id)
+            tokenizer.push_to_hub(args.hub_model_id)
+            logger.info("Successfully pushed to Hugging Face Hub!")
+        except Exception as e:
+            logger.error(f"Failed to push to Hugging Face Hub: {e}")
 
 if __name__ == "__main__":
     main()

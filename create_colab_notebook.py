@@ -84,7 +84,10 @@ def build_notebook():
         "- [Gemma 4 E2B Base](https://huggingface.co/google/gemma-4-E2B)",
         "- [Gemma 4 E2B IT](https://huggingface.co/google/gemma-4-E2B-it)",
         "",
-        "Once accepted, grab your **Hugging Face Token** and enter it below. The cell is designed to automatically check for Colab's built-in **Secrets** manager (recommended) or fall back to an interactive login block."
+        "Once accepted, grab your **Hugging Face Token** and enter it below. The cell is designed to automatically check for Colab's built-in **Secrets** manager (recommended) or fall back to an interactive login block.",
+        "",
+        "> [%sIMPORTANT]" % "!" + "\n" +
+        "> **🔑 Sharing and Pushing to HF Hub:** If you plan to upload your fine-tuned model weights to the **Hugging Face Hub** at the end of this notebook, make sure to generate and use a Hugging Face Token with **Write** permissions (from your [Hugging Face Settings -> Access Tokens](https://huggingface.co/settings/tokens)). A read-only token can download the models but will fail during push operations."
     ])
 
     add_code([
@@ -130,6 +133,16 @@ def build_notebook():
         "    quantization_config=bnb_config,\n",
         "    device_map=\"auto\"\n",
         ")\n",
+        "\n",
+        "# Unwrap Gemma4ClippableLinear modules if present to prevent PEFT/LoRA errors\n",
+        "for name, module in list(it_model.named_modules()):\n",
+        "    if module.__class__.__name__ == 'Gemma4ClippableLinear':\n",
+        "        parts = name.split('.')\n",
+        "        parent = it_model\n",
+        "        for part in parts[:-1]:\n",
+        "            parent = getattr(parent, part)\n",
+        "        setattr(parent, parts[-1], module.linear)\n",
+        "\n",
         "it_tokenizer = AutoTokenizer.from_pretrained(it_model_id)\n",
         "print(\"✅ Instruction-Tuned model loaded successfully!\")\n",
         "\n",
@@ -268,6 +281,16 @@ def build_notebook():
         "    quantization_config=bnb_config,\n",
         "    device_map=\"auto\"\n",
         ")\n",
+        "\n",
+        "# Unwrap Gemma4ClippableLinear modules if present to prevent PEFT/LoRA errors\n",
+        "for name, module in list(base_model.named_modules()):\n",
+        "    if module.__class__.__name__ == 'Gemma4ClippableLinear':\n",
+        "        parts = name.split('.')\n",
+        "        parent = base_model\n",
+        "        for part in parts[:-1]:\n",
+        "            parent = getattr(parent, part)\n",
+        "        setattr(parent, parts[-1], module.linear)\n",
+        "\n",
         "base_tokenizer = AutoTokenizer.from_pretrained(base_model_id)\n",
         "print(\"✅ Base model loaded successfully!\")\n",
         "\n",
@@ -547,6 +570,16 @@ def build_notebook():
         "    quantization_config=bnb_config,\n",
         "    device_map=\"auto\"\n",
         ")\n",
+        "\n",
+        "# Unwrap Gemma4ClippableLinear modules if present to prevent PEFT/LoRA errors\n",
+        "for name, module in list(base_model.named_modules()):\n",
+        "    if module.__class__.__name__ == 'Gemma4ClippableLinear':\n",
+        "        parts = name.split('.')\n",
+        "        parent = base_model\n",
+        "        for part in parts[:-1]:\n",
+        "            parent = getattr(parent, part)\n",
+        "        setattr(parent, parts[-1], module.linear)\n",
+        "\n",
         "base_tokenizer = AutoTokenizer.from_pretrained(base_model_id)\n",
         "print(\"✅ Fresh Base model loaded successfully!\")\n",
         "\n",
@@ -745,6 +778,73 @@ def build_notebook():
         "# 4. Upload local fine-tuned adapter directory to GCS\n",
         "!gcloud storage cp -r ./fine_tuned_gemma_adapter gs://{GCS_BUCKET_NAME}/gemma-4-adapters/\n",
         "print(f\"\\n🎉 Successfully uploaded fine-tuned adapter weights to: gs://{GCS_BUCKET_NAME}/gemma-4-adapters/\")"
+    ])
+    
+    # --- CELL 16: Markdown Section 7 (Hugging Face Hub and Browser Download) ---
+    add_markdown([
+        "## 🤗 Step 8: Alternative Export Methods (Hugging Face Hub & Browser Download)",
+        "",
+        "If you want to share your fine-tuned model with others so they can immediately test its behavior, or simply keep a local backup on your machine without using a GCP storage bucket, you can use these two highly convenient alternative export methods.",
+        "",
+        "### 🛒 Option A: Share publicly on the Hugging Face Hub (Recommended)",
+        "Uploading your adapter directly to the Hugging Face Hub makes it incredibly easy for others to load and use. Anyone else running this notebook (or your local serving script) can simply reference your public model ID (e.g., `your_username/gemma-4-sentiment-adapter`) to run instant inference!"
+    ])
+    
+    # --- CELL 17: Push to HF Hub block ---
+    add_code([
+        "#@title 🤗 Share adapter publicly on Hugging Face Hub { run: \"manual\" }\n",
+        "#@markdown Enter your Hugging Face username and desired repository name below.\n",
+        "#@markdown Make sure you logged in with a WRITE token in Step 1!\n",
+        "\n",
+        "HF_USERNAME = \"your_hf_username\" #@param {type:\"string\"}\n",
+        "HF_REPO_NAME = \"gemma-4-sentiment-adapter\" #@param {type:\"string\"}\n",
+        "\n",
+        "hub_model_id = f\"{HF_USERNAME}/{HF_REPO_NAME}\"\n",
+        "\n",
+        "if HF_USERNAME == \"your_hf_username\":\n",
+        "    print(\"⚠️ Please enter your real Hugging Face username in the form-field above!\")\n",
+        "else:\n",
+        "    print(f\"⏳ Pushing adapter weights and tokenizer to Hugging Face Hub: {hub_model_id}...\")\n",
+        "    try:\n",
+        "        # Push the PEFT adapter model and base tokenizer\n",
+        "        trainer.model.push_to_hub(hub_model_id, private=False)\n",
+        "        base_tokenizer.push_to_hub(hub_model_id, private=False)\n",
+        "        print(f\"\\n🎉 Successfully pushed to HF Hub! View it at: https://huggingface.co/{hub_model_id}\")\n",
+        "        print(\"\\n💡 Others can load and use your adapter directly using:\")\n",
+        "        print(f\"   PeftModel.from_pretrained(base_model, \\\"{hub_model_id}\\\")\")\n",
+        "    except Exception as e:\n",
+        "        print(f\"\\n❌ Push failed: {e}\")\n",
+        "        print(\"💡 Did you use a token with WRITE permissions during login in Step 1?\")"
+    ])
+    
+    # --- CELL 18: Browser Download markdown ---
+    add_markdown([
+        "### 📥 Option B: Download directly to your local machine",
+        "",
+        "If you don't have a Google Cloud or Hugging Face account and just want a local copy of your fine-tuned weights, you can compress the adapter directory into a `.zip` archive and download it directly through your web browser."
+    ])
+    
+    # --- CELL 19: Browser Download block ---
+    add_code([
+        "import os\n",
+        "import zipfile\n",
+        "from google.colab import files\n",
+        "\n",
+        "zip_path = \"./fine_tuned_gemma_adapter.zip\"\n",
+        "adapter_dir = \"./fine_tuned_gemma_adapter\"\n",
+        "\n",
+        "print(\"⏳ Compressing fine-tuned adapter folder...\")\n",
+        "with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:\n",
+        "    for root, dirs, files_in_dir in os.walk(adapter_dir):\n",
+        "        for file in files_in_dir:\n",
+        "            file_path = os.path.join(root, file)\n",
+        "            # Maintain relative path inside zip\n",
+        "            arcname = os.path.relpath(file_path, os.path.dirname(adapter_dir))\n",
+        "            zipf.write(file_path, arcname)\n",
+        "\n",
+        "print(f\"✅ Compression complete! File size: {os.path.getsize(zip_path) / (1024*1024):.2f} MB\")\n",
+        "print(\"⏳ Starting browser download. Please allow popups if prompted...\")\n",
+        "files.download(zip_path)"
     ])
 
     # Save to disk
