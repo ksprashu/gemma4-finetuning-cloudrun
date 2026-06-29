@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemma 4 Fine-tuning encyclopaedia</title>
+    <title>Gemma 4 Fine-tuning Encyclopaedia</title>
     <!-- Inter & JetBrains Mono Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -445,6 +445,15 @@
             font-size: 0.875rem;
             color: var(--text-secondary);
             border-bottom: 1px solid var(--border);
+        }
+
+        th:first-child, td:first-child {
+            white-space: nowrap;
+        }
+
+        td:first-child code {
+            white-space: nowrap !important;
+            word-break: normal !important;
         }
 
         tr:last-child td {
@@ -891,16 +900,16 @@
         <aside>
             <div class="brand-container">
                 <div class="brand-icon">G</div>
-                <div class="brand-title">Gemma 4 Fine-tuning encyclopaedia</div>
+                <div class="brand-title">Gemma 4 Fine-tuning Encyclopaedia</div>
             </div>
 
             <div class="search-wrapper">
                 <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                <input type="text" class="search-input" id="toc-search" placeholder="Search encyclopedia..." onkeyup="fuzzySearchTOC()">
+                <input type="text" class="search-input" id="toc-search" placeholder="Search encyclopaedia..." onkeyup="fuzzySearchTOC()">
             </div>
 
-            <div class="nav-section-title">Manual Chapters</div>
-            <ul class="nav-menu" id="nav-list">
+            <div class="nav-section-title">Chapters</div>
+            <ul class="nav-menu" id="nav-list-kb">
                 <li>
                     <a href="#introduction" class="nav-item active" onclick="setActiveNav(event, this)">
                         <span>Cover &amp; Introduction</span>
@@ -908,50 +917,54 @@
                     </a>
                 </li>
                 <li>
-                    <a href="#chapter1" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>1. Inference Engines</span>
-                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
-                    </a>
-                </li>
-                <li>
-                    <a href="#chapter2" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>2. Quantisation Formats</span>
+                    <a href="#chapter6" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>1. Agentic Dataset Prep</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
                 <li>
                     <a href="#chapter3" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>3. Fine-Tuning &amp; PEFT</span>
+                        <span>2. Fine-Tuning &amp; PEFT</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter2" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>3. Quantisation Formats</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter1" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>4. Inference Engines</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
                 <li>
                     <a href="#chapter4" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>4. Robust Evaluation</span>
-                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
-                    </a>
-                </li>
-                <li>
-                    <a href="#chapter5" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>5. Our Pipeline Lessons</span>
-                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
-                    </a>
-                </li>
-                <li>
-                    <a href="#chapter6" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>6. Agentic Dataset Prep</span>
-                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
-                    </a>
-                </li>
-                <li>
-                    <a href="#chapter7" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>7. Project Run Guide</span>
+                        <span>5. Robust Evaluation</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
                 <li>
                     <a href="#chapter8" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>8. Advanced Optimization</span>
+                        <span>6. Advanced Optimization</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter5" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>7. Empirical Pipeline Lessons</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+            </ul>
+
+            <div class="nav-section-title" style="margin-top: 1.5rem;">Project Artifacts</div>
+            <ul class="nav-menu" id="nav-list-artifacts">
+                <li>
+                    <a href="#chapter7" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>8. Project Run Guide</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
@@ -970,20 +983,24 @@
             
             <!-- Top Bar with controls -->
             <div class="top-bar">
-                <div class="breadcrumbs" id="top-breadcrumbs">Gemma 4 Fine-tuning encyclopaedia &gt; Introduction</div>
+                <div class="breadcrumbs" id="top-breadcrumbs">Gemma 4 Fine-tuning Encyclopaedia &gt; Introduction</div>
                 <!-- Responsive Mobile Chapter Navigation Dropdown -->
                 <div class="mobile-nav-container">
                     <select id="mobile-chapter-select" onchange="window.location.hash = this.value; const link = document.querySelector('.nav-item[href=\'' + this.value + '\']'); if (link) { setActiveNav(null, link); }">
                         <option value="#introduction" selected>Cover &amp; Introduction</option>
-                        <option value="#chapter1">1. Inference Engines</option>
-                        <option value="#chapter2">2. Quantisation Formats</option>
-                        <option value="#chapter3">3. Fine-Tuning &amp; PEFT</option>
-                        <option value="#chapter4">4. Robust Evaluation</option>
-                        <option value="#chapter5">5. Our Pipeline Lessons</option>
-                        <option value="#chapter6">6. Agentic Dataset Prep</option>
-                        <option value="#chapter7">7. Project Run Guide</option>
-                        <option value="#chapter8">8. Advanced Deep Learning Optimization</option>
-                        <option value="#chapter9">9. Notebook Code Companion Guide</option>
+                        <optgroup label="Chapters">
+                            <option value="#chapter6">1. Agentic Dataset Prep</option>
+                            <option value="#chapter3">2. Fine-Tuning &amp; PEFT</option>
+                            <option value="#chapter2">3. Quantisation Formats</option>
+                            <option value="#chapter1">4. Inference Engines</option>
+                            <option value="#chapter4">5. Robust Evaluation</option>
+                            <option value="#chapter8">6. Advanced Optimization</option>
+                            <option value="#chapter5">7. Empirical Pipeline Lessons</option>
+                        </optgroup>
+                        <optgroup label="Project Artifacts">
+                            <option value="#chapter7">8. Project Run Guide</option>
+                            <option value="#chapter9">9. Notebook Walkthrough</option>
+                        </optgroup>
                     </select>
                 </div>
                 <button class="theme-toggle-btn" onclick="toggleTheme()">
@@ -997,8 +1014,8 @@
             <!-- INTRODUCTION -->
             <article id="introduction" class="active-page">
                 <div class="hero-section">
-                    <span class="book-badge">The Complete Encyclopedia</span>
-                    <h1>The Gemma 4 Fine-Tuning &amp; Inference Encyclopedia</h1>
+                    <span class="book-badge">The Complete Encyclopaedia</span>
+                    <h1>The Gemma 4 Fine-Tuning &amp; Inference Encyclopaedia</h1>
                     <div class="subtitle">An Opinionated, Low-Hype Engineering Guide to Optimising, Serving, and Evaluating Google's Edge Multimodal Models.</div>
                 </div>
 
@@ -1057,17 +1074,17 @@
                     <p style="margin-bottom: 0; margin-top: 0.5rem;">Because modern GPUs process floating-point math orders of magnitude faster than they can read bytes from physical RAM, the tensor cores spend up to 99% of their cycles idle, waiting for weights to load. The speed of inference is thus directly governed by the memory-transfer rate, making weight quantization (e.g., compressing 16-bit weights to 4-bit) the primary mechanism for accelerating serving speeds.</p>
                 </div>
 
-                <h2>Encyclopedia Structure</h2>
+                <h2>Encyclopaedia Structure</h2>
                 <p>This comprehensive technical resource is organized into nine specialized chapters, mapping the lifecycle of model serving, compression, training, and evaluation:</p>
                 <ul>
-                    <li><strong>Chapter 1: Mainstream Model Runtimes &amp; Inference Engines:</strong> A deep comparison of vLLM, Hugging Face, Apple MLX, Google LiteRT, and llama.cpp.</li>
-                    <li><strong>Chapter 2: Quantisation Formats &amp; Mechanics:</strong> The mathematics of affine quantisation and the binary layout of GGUF.</li>
-                    <li><strong>Chapter 3: Fine-Tuning &amp; PEFT:</strong> Low-level adapters, including the mathematics of DoRA and validated training recipes.</li>
-                    <li><strong>Chapter 4: Robust Evaluation:</strong> Rigorous methodologies including programmatic string metrics, safety classifiers, and LLM-as-a-Judge.</li>
-                    <li><strong>Chapter 5: Our Pipeline Lessons:</strong> Architecture diagrams and lessons learned during Cloud Run serverless container deployments.</li>
-                    <li><strong>Chapter 6: Agentic Dataset Prep:</strong> How to coordinate the Google Antigravity (AGY) Producer Archetype to synthesize high-quality JSON schemas.</li>
-                    <li><strong>Chapter 7: Project Run Guide:</strong> Direct terminal orchestration guides for compiling pipelines, generating data, and deploying servers.</li>
-                    <li><strong>Chapter 8: Advanced Deep Learning Optimization:</strong> Cutting-edge model compression and serving topics including Speculative Decoding, Teacher-Student Distillation, Quantization-Aware Training (QAT), Structured/Unstructured Pruning, and multi-node Kubernetes GKE pipelines.</li>
+                    <li><strong>Chapter 1: Agentic Dataset Prep:</strong> How to coordinate the Google Antigravity (AGY) Producer Archetype to synthesize high-quality JSON schemas.</li>
+                    <li><strong>Chapter 2: Fine-Tuning &amp; PEFT:</strong> Low-level adapters, including the mathematics of DoRA and validated training recipes.</li>
+                    <li><strong>Chapter 3: Quantisation Formats &amp; Mechanics:</strong> The mathematics of affine quantisation and the binary layout of GGUF.</li>
+                    <li><strong>Chapter 4: Mainstream Model Runtimes &amp; Inference Engines:</strong> A deep comparison of vLLM, Hugging Face, Apple MLX, Google LiteRT, and llama.cpp.</li>
+                    <li><strong>Chapter 5: Robust Evaluation:</strong> Rigorous methodologies including programmatic string metrics, safety classifiers, and LLM-as-a-Judge.</li>
+                    <li><strong>Chapter 6: Advanced Deep Learning Optimization:</strong> Cutting-edge model compression and serving topics including Speculative Decoding, Teacher-Student Distillation, Quantization-Aware Training (QAT), Structured/Unstructured Pruning, and multi-node Kubernetes GKE pipelines.</li>
+                    <li><strong>Chapter 7: Our Pipeline Lessons:</strong> Architecture diagrams and lessons learned during Cloud Run serverless container deployments.</li>
+                    <li><strong>Chapter 8: Project Run Guide:</strong> Direct terminal orchestration guides for compiling pipelines, generating data, and deploying servers.</li>
                     <li><strong>Chapter 9: Notebook Code Companion Guide:</strong> A granular, line-by-line and parameter-by-parameter analysis of our complete Colab fine-tuning and evaluation notebook, explaining exact variable values, available configuration options, and customization strategies.</li>
                 </ul>
 
@@ -1163,583 +1180,135 @@
             </article>
 
 
-            <!-- CHAPTER 1: MODEL RUNTIMES -->
-            <article id="chapter1">
+            <!-- CHAPTER 6: AGENTIC DATASET PREPARATION -->
+            <article id="chapter6">
                 <span class="book-badge">Chapter 1</span>
-                <h2>Mainstream Model Runtimes &amp; Inference Engines</h2>
-                <p>The runtime you wrap around model weights dictates your serving efficiency. In server-side serving, memory throughput determines single-stream speed, while batch execution models dictate overall concurrent requests capacities. Let's inspect the six mainstream open architectures.</p>
-
-                <h3>1. vLLM: High-Concurrency Cloud Serving</h3>
-                <p><strong>Under the Hood:</strong> vLLM is an engine designed specifically for high-concurrency server deployments. Its core innovation is <strong>PagedAttention</strong> (Kwon et al., 2023). Traditional transformers pre-allocate static memory for the Key-Value (KV) cache of every sequence based on maximum context lengths. This design fragments memory up to 80% with unused gaps (internal, external, and reservation overheads). PagedAttention behaves like virtual paging in operating systems--dividing the KV cache of each sequence into fixed-size physical blocks mapped dynamically, liberating VRAM to scale batch sizes by 10x without memory exhaustion.</p>
+                <h2>Agentic Dataset Synthesis &amp; Multimodal Architectures</h2>
                 
-                <h4>Logical-to-Physical Block Translation</h4>
-                <p>Let $s$ represent a sequence. The key-value states for token position $i$ are mapped to a specific physical block and slot index within that block:</p>
+                <h3>Multimodal Vision-Language Architecture (Gemma Vision)</h3>
+                <p>Gemma Vision models (such as Gemma 2 2B-V and Gemma 2 9B-V) extend Google’s causal language model architecture with advanced visual comprehension capabilities. Instead of treating input purely as text-only causal tokens, these models ingest interleaved text and visual inputs dynamically, aligning them in a shared semantic latent space.</p>
+                
+                <h4>1. Vision Encoder: SigLIP</h4>
+                <p>The visual frontend of the model is powered by **SigLIP (Sigmoid Language-Image Pre-training)**, typically using a Vision Transformer (ViT) variant such as <code>siglip-so400m-patch14-384</code>.</p>
                 <ul>
-                    <li><strong>Block Size ($B$):</strong> The fixed number of tokens per block (typically $B = 16$ or $B = 32$).</li>
-                    <li><strong>Logical Block Index ($lb$):</strong> The index of the block in the sequence's logical timeline:
-                        <div class="math-block" style="text-align: center;">
-                            $$lb = \lfloor i / B \rfloor$$
-                        </div>
-                    </li>
-                    <li><strong>Block Offset / Slot Index ($offset$):</strong> The position of the token within its block:
-                        <div class="math-block" style="text-align: center;">
-                            $$offset = i \pmod B$$
-                        </div>
-                    </li>
-                    <li><strong>Block Table Function ($\mathcal{M}(s, lb)$):</strong> A mapping table maintained by the vLLM scheduler that translates the logical block index $lb$ of sequence $s$ to a physical block frame number $P \in \mathbb{N}$ in GPU VRAM:
-                        <div class="math-block" style="text-align: center;">
-                            $$\mathcal{M}(s, \lfloor i / B \rfloor) = P$$
-                        </div>
+                    <li><strong>Sigmoid Loss:</strong> Unlike standard CLIP which uses a softmax loss across an entire batch (coupling all examples together and requiring massive batch sizes for stabilization), SigLIP employs a pairwise sigmoid loss. This treats the image-text matching task as a collection of independent binary classification tasks, stabilizing training and scaling efficiently to arbitrary batch sizes.</li>
+                    <li><strong>Visual Tokenization:</strong> A raw image of size \(H \times W\) is split into a grid of non-overlapping patches of size \(P \times P\) (where \(P = 14\) is the patch size). For a standard input resolution of \(384 \times 384\) pixels:
+                        $$N_{\text{patches}} = \left( \frac{H}{P} \right) \times \left( \frac{W}{P} \right) = \left( \frac{384}{14} \right) \times \left( \frac{384}{14} \right) \approx 27.4 \times 27.4 \implies 729 \text{ tokens}$$
+                        These 729 visual tokens are processed by the ViT to output 729 patch embeddings, each of dimension \(d_{\text{vision}} = 1152\) (for the SO400m backbones).
                     </li>
                 </ul>
-                <p>The physical address of the key or value vector for token $i$ at layer $l$ is calculated dynamically as:</p>
-                <div class="math-block" style="text-align: center;">
-                    $$\text{Physical Address}(i, l) = \text{BaseAddress}\left(\mathcal{M}\left(s, \lfloor i / B \rfloor\right)\right) + (i \pmod B) \times \text{SlotSize}_l$$
-                </div>
-                <p>Where the slot size (in bytes) is:
-                    $$\text{SlotSize}_l = 2 \times H_{kv} \times D_{\text{head}} \times 2 \text{ bytes (for FP16/BF16)}$$
-                </p>
-                <p>Here, the leading multiplier $2$ accounts for the separate storage of both the Key and Value vectors for each token. $H_{kv}$ represents the number of Key-Value attention heads standard in Grouped-Query Attention (GQA), which is typically smaller than the number of Query attention heads (e.g., 4 or 8 in Gemma 2/4). This distinction prevents severe overestimation of physical memory requirements.</p>
 
-                <h4>Attention Computation using PagedAttention</h4>
-                <p>During the decoding phase, when a new query token $q_i$ arrives, the attention score $A_{i, j}$ between $q_i$ and all historical key tokens $k_j$ ($j \le i$) is computed. Instead of assuming linear memory layout, the custom CUDA attention kernel loops over physical pages:</p>
-                <div class="math-block" style="text-align: center;">
-                    $$A_{i, j} = \frac{q_i \cdot K[\mathcal{M}(s, \lfloor j/B \rfloor), j \pmod B]^T}{\sqrt{D_{\text{head}}}}$$
-                </div>
-                <p>Where $K[P, offset]$ directly accesses the physical memory offset within page $P$ on the GPU. This eliminates contiguous memory constraints completely, reducing KV cache fragmentation to less than 4% of total VRAM.</p>
-
-                <h4>Copy-on-Write (CoW) for Parallel Sampling</h4>
-                <p>PagedAttention enables efficient prompt sharing during parallel sampling or beam search. When generating multiple responses from a single prompt, the prompt’s physical blocks are shared across sequences. When a shared block requires editing (e.g., if writing new tokens to a partially-filled block), the vLLM scheduler increments the reference count. If multiple sequences write to a shared block, the scheduler copies the block's physical content to a new frame, decrements the reference count of the old frame, and maps the sequence to the new frame. This <strong>Copy-on-Write (CoW)</strong> allocation allows zero-overhead multi-candidate sampling.</p>
-
-                <p><strong>Deployment Stack:</strong> Best-suited for hosting OpenAI-compatible endpoints on discrete GPUs in GCP GKE or Cloud Run. For more information, refer to the <a href="https://docs.vllm.ai/en/latest/" target="_blank">Official vLLM Documentation</a>.</p>
-                
-                <div class="code-header"><span>vLLM Serving Startup CLI</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
-                <pre><code class="language-bash"># Serve Gemma 4 E4B Instruct with on-the-fly FP8 quantisation
-python3 -m vllm.entrypoints.openai.api_server \
-    --model google/gemma-4-e4b-it \
-    --quantization fp8 \
-    --enable-prefix-caching \
-    --gpu-memory-utilization 0.90 \
-    --port 8000</code></pre>
-
-                <h3>2. Hugging Face Transformers</h3>
-                <p><strong>Under the Hood:</strong> Hugging Face remains the absolute gold standard for developer research, prototyping, and PEFT adapter integration. It is a highly modular, PyTorch-native abstraction layer. Although uncompiled dynamic graph execution in PyTorch introduces minor latency, modern Transformers optimizes this out via <strong>Scaled Dot-Product Attention (SDPA)</strong>, <code>bitsandbytes</code> quantisation bindings, and direct model compilation on Hugging Face <code>optimum</code>.</p>
-                <p>To learn more, check out the <a href="https://huggingface.co/docs/transformers/index" target="_blank">Official HF Transformers Docs</a> and the <a href="https://huggingface.co/docs/peft/index" target="_blank">Official HF PEFT Docs</a>.</p>
-                
-                <div class="code-header"><span>Hugging Face Transformers Generation</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
-                <pre><code class="language-python">import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-
-# Configure 4-bit NormalFloat quantisation for VRAM containment
-bnb_config = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_compute_dtype=torch.float16
-)
-
-tokenizer = AutoTokenizer.from_pretrained("google/gemma-4-e2b-it")
-model = AutoModelForCausalLM.from_pretrained(
-    "google/gemma-4-e2b-it",
-    quantization_config=bnb_config,
-    device_map="auto"
-)
-
-messages = [{"role": "user", "content": "How do you avoid VRAM fragmentation?"}]
-prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-
-with torch.no_grad():
-    outputs = model.generate(**inputs, max_new_tokens=256)
-print(tokenizer.decode(outputs[0], skip_special_tokens=True))</code></pre>
-
-                <h3>3. Apple MLX</h3>
-                <p><strong>Under the Hood:</strong> MLX is Apple's specialized array framework tailored natively for Apple Silicon (M1/M2/M3/M4 chips). It bypasses standard GPU/CPU system data transfer structures entirely by exploiting Apple's <strong>Unified Memory Architecture (UMA)</strong>. The CPU and GPU share a single physical memory pool--enabling Zero-Copy mechanics where weights loaded onto Apple Silicon require zero bus overhead or copying step between processing elements.</p>
-                <ul>
-                    <li><strong>Zero-Copy Performance:</strong> Loading a 4-bit quantized Gemma model into MLX maps the weights directly from disk into Unified Memory. The weights are read by GPU computing kernels directly, completely eliminating memory duplication and copy overhead.</li>
-                    <li><strong>Lazy Evaluation:</strong> MLX uses a lazy evaluation engine. No calculations are executed when code is written; instead, MLX builds a directed acyclic graph (DAG) of the operations. Execution is deferred until the user explicitly reads or prints the array contents, enabling deep graph-level compiler optimizations.</li>
-                </ul>
-                <p>For official examples and APIs, see the <a href="https://github.com/ml-explore/mlx" target="_blank">Official Apple MLX Repository</a> and the <a href="https://github.com/ml-explore/mlx-examples/tree/main/llms" target="_blank">Official MLX-LM Framework Examples</a>.</p>
-
-                <div class="code-header"><span>Complete MLX Inference & Low-Level Dequantization Script</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
-                <pre><code class="language-python">import mlx.core as mx
-import mlx.nn as nn
-from mlx_lm import load, generate
-
-def run_high_level_mlx():
-    """
-    Demonstrates native zero-copy loading and generation using mlx-lm.
-    """
-    # Load 4-bit quantized Gemma model from HF. 
-    # MLX-LM automatically utilizes Apple Unified Memory with zero-copy loading.
-    model_id = "mlx-community/gemma-2-9b-it-4bit"
-    print(f"[MLX] Loading native 4-bit model from: {model_id}")
-    
-    model, tokenizer = load(model_id)
-    
-    # Format prompt using Gemma's chat template
-    messages = [{"role": "user", "content": "Explain unified memory in Apple Silicon."}]
-    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    
-    print("[MLX] Starting zero-copy inference execution...\n")
-    # Generates tokens dynamically with GPU acceleration
-    response = generate(
-        model=model,
-        tokenizer=tokenizer,
-        prompt=prompt,
-        max_tokens=200,
-        temp=0.7,
-        verbose=True
-    )
-    return response
-
-
-class MLXQuantizedLinear(nn.Module):
-    """
-    Under-the-hood representation of how MLX performs 4-bit dequantization
-    and matrix multiplication directly in Apple Unified Memory.
-    """
-    def __init__(self, in_features: int, out_features: int, bits: int = 4, group_size: int = 64):
-        super().__init__()
-        self.bits = bits
-        self.group_size = group_size
-        self.in_features = in_features
-        self.out_features = out_features
-        
-        # In MLX, quantized weights are stored as uint32 indices alongside scale and bias vectors
-        # All allocations are initialized directly in Unified Memory.
-        self.weight = mx.zeros((out_features, in_features // (32 // bits)), dtype=mx.uint32)
-        self.scales = mx.zeros((out_features, in_features // group_size), dtype=mx.float16)
-        self.biases = mx.zeros((out_features, in_features // group_size), dtype=mx.float16)
-
-    def __call__(self, x: mx.array) -> mx.array:
-        """
-        Runs on-the-fly dequantization and matmul within GPU unified memory.
-        """
-        # mx.quantized_matmul compiles into custom Metal Shading Language (MSL) kernels,
-        # executing dequantization directly inside the GPU registers to avoid VRAM bandwidth bottlenecks.
-        return mx.quantized_matmul(
-            x, 
-            self.weight, 
-            self.scales, 
-            self.biases, 
-            transpose=True, 
-            bits=self.bits, 
-            group_size=self.group_size
-        )
-
-if __name__ == "__main__":
-    # Run high-level inference demonstration
-    run_high_level_mlx()</code></pre>
-
-                <h3>4. Google LiteRT &amp; LiteRT-LM</h3>
-                <p><strong>Under the Hood:</strong> LiteRT (formerly TensorFlow Lite) is Google's high-efficiency on-device runtime. By compiling model graphs down into flatbuffer schema files (<code>.tflite</code> / <code>.litertlm</code>), it strips Python dependencies and compiles optimized execution nodes for local NPUs, Android/iOS devices, or edge browsers using hardware-level backends like XNNPACK or WebGPU.</p>
-                <ul>
-                    <li><strong>Flatbuffer Serialization:</strong> Packaging the compiled network graph, fused operators, and quantized weights into a single binary flatbuffer schema file (<code>.task</code> / <code>.tflite</code>). This enables zero-copy deserialization where weights are mapped directly into system memory, avoiding allocation overhead.</li>
-                    <li><strong>Operator Fusion:</strong> Complex operations like multi-head attention (MHA) and layer normalization are fused into single highly-optimized kernels to eliminate runtime dispatch latency.</li>
-                </ul>
-                <p>For more information, see the <a href="https://ai.google.dev/edge/litert" target="_blank">Official Google LiteRT-LM Documentation</a>.</p>
-
-                <div class="code-header"><span>LiteRT-LM Python On-Device Inference</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
-                <pre><code class="language-python">import os
-import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import text
-
-def run_litert_inference():
-    # Path to the compiled LiteRT flatbuffer LLM task
-    # This file contains the fused model graph and 4-bit quantized Gemma weights.
-    model_path = "gemma-2b-it-gpu.task"
-    
-    if not os.path.exists(model_path):
-        print(f"Please compile or download the LiteRT model to '{model_path}' before running.")
-        return
-
-    print(f"[LiteRT-LM] Initializing LLM engine from: {model_path}")
-    
-    # Configure options with hardware delegation (Metal on macOS, OpenCL/Vulkan on Android)
-    options = text.LlmInference.Options(
-        model_path=model_path,
-        max_results=256,
-        temperature=0.7,
-        top_k=40,
-    )
-    
-    # Initialize the generator task
-    with text.LlmInference.create_from_options(options) as generator:
-        prompt = "Define the purpose of a flatbuffer format in edge AI."
-        print(f"\nPrompt: {prompt}\n")
-        
-        # 1. Synchronous generation
-        response = generator.generate_response(prompt)
-        print(f"Response: {response}\n")
-        
-        # 2. Asynchronous / Streaming generation demonstration
-        print("Streaming response:")
-        def stream_callback(partial_text, done):
-            print(partial_text, end="", flush=True)
-            
-        generator.generate_response_async(
-            "List three key features of LiteRT-LM.", 
-            stream_callback
-        )
-        print()
-
-if __name__ == "__main__":
-    run_litert_inference()</code></pre>
-
-                <div class="code-header"><span>LiteRT-LM C++ Low-Latency Inference</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
-                <pre><code class="language-cpp">#include &lt;iostream&gt;
-#include &lt;string&gt;
-#include "mediapipe/tasks/cc/text/llm_inference/llm_inference.h"
-
-using namespace mediapipe::tasks::text::llm_inference;
-
-int main() {
-    // 1. Initialize LiteRT-LM configuration options
-    LlmInference::Options options;
-    options.model_path = "/var/mobile/gemma-2b-it-gpu.task";
-    options.max_results = 256;
-    options.temperature = 0.7;
-    options.top_k = 40;
-
-    // 2. Instantiate the inference engine
-    std::cout &lt;&lt; "Loading LiteRT-LM model..." &lt;&lt; std::endl;
-    auto generator = LlmInference::CreateFromOptions(options);
-    if (!generator.ok()) {
-        std::cerr &lt;&lt; "Initialization failed: " &lt;&lt; generator.status().message() &lt;&lt; std::endl;
-        return -1;
-    }
-
-    // 3. Run synchronous inference
-    std::string prompt = "Explain on-device quantization.";
-    std::cout &lt;&lt; "\nPrompt: " &lt;&lt; prompt &lt;&lt; std::endl;
-    
-    auto response = (*generator)-&gt;GenerateResponse(prompt);
-    if (response.ok()) {
-        std::cout &lt;&lt; "Response:\n" &lt;&lt; *response &lt;&lt; std::endl;
-    } else {
-        std::cerr &lt;&lt; "Inference failed: " &lt;&lt; response.status().message() &lt;&lt; std::endl;
-    }
-
-    return 0;
-}</code></pre>
-
-                <h3>5. llama.cpp &amp; Ollama</h3>
-                <p><strong>Under the Hood:</strong> <code>llama.cpp</code> is a pure, zero-dependency C/C++ implementation of the transformer architecture designed by Georgi Gerganov. It is the absolute king of local CPU/GPU cross-platform execution. It maps model weights directly using <strong>mmap</strong> (avoiding virtual memory indexing bloat) and parses highly compressed <strong>GGUF</strong> files. <strong>Ollama</strong> runs a Go-based background daemon on top of llama.cpp, automating layer offloading and API serving.</p>
-                <p>Check out the <a href="https://github.com/ggerganov/llama.cpp" target="_blank">Official llama.cpp GitHub Repository</a> to get started.</p>
-
-                <!-- RUNTIMES COMPARISON TABLE -->
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Runtime Engine</th>
-                            <th>Target HW</th>
-                            <th>Memory Overhead</th>
-                            <th>Relative Throughput</th>
-                            <th>Primary Quantisation</th>
-                            <th>Ideal Use Case</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><strong>vLLM</strong></td>
-                            <td>discrete GPU</td>
-                            <td>High (Pre-allocates cache)</td>
-                            <td>Ultra-High (10x concurrency)</td>
-                            <td>AWQ, GPTQ, FP8</td>
-                            <td>High-scale Cloud Serving APIs</td>
-                        </tr>
-                        <tr>
-                            <td><strong>HF Transformers</strong></td>
-                            <td>CUDA, ROCm, CPU</td>
-                            <td>Medium</td>
-                            <td>Low-Medium</td>
-                            <td>NF4, double quant, INT8</td>
-                            <td>Prototyping &amp; PEFT adapter training</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Apple MLX</strong></td>
-                            <td>Apple Silicon</td>
-                            <td>Ultra-Low (Zero-copy)</td>
-                            <td>High</td>
-                            <td>MLX-4bit, MLX-8bit</td>
-                            <td>Local Mac Development &amp; Serving</td>
-                        </tr>
-                        <tr>
-                            <td><strong>LiteRT / LiteRT-LM</strong></td>
-                            <td>Mobile, Web, Edge</td>
-                            <td>Ultra-Low</td>
-                            <td>High (on local hardware)</td>
-                            <td>FP8, INT4, INT8</td>
-                            <td>On-device Android/iOS and edge browsers</td>
-                        </tr>
-                        <tr>
-                            <td><strong>llama.cpp</strong></td>
-                            <td>CPU, macOS, Edge</td>
-                            <td>Low</td>
-                            <td>Medium-High</td>
-                            <td>GGUF (Q4_K_M, Q5_K_M)</td>
-                            <td>Local consumer desktop deployments</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <!-- CHAPTER 1 QUIZ -->
-                <div class="quiz-container">
-                    <div class="quiz-question">Knowledge Check: Why does vLLM's PagedAttention dramatically outperform traditional Hugging Face Transformers serving on concurrent serving?</div>
-                    <div class="quiz-options">
-                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Exactly! PagedAttention breaks the Key-Value cache of each sequence into fixed-size physical memory pages, eliminating internal fragmentation and letting you scale batch sizes without VRAM blowout.')">
-                            A) It divides KV cache tensors into fixed-size virtual pages, completely eliminating VRAM fragmentation.
-                        </div>
-                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Model weights are static. The dynamic memory blowout during concurrent serving is driven by the dynamic KV cache of active user threads.')">
-                            B) It compresses the static model weights into lower precision arrays dynamically during forward runs.
-                        </div>
-                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. While continuous batching helps with iteration-level scheduling, PagedAttention specifically solves the raw physical memory management.')">
-                            C) It bypasses GPU hardware boundaries entirely to run on system RAM.
-                        </div>
-                    </div>
-                    <div class="quiz-feedback"></div>
-                </div>
-            </article>
-
-
-            <!-- CHAPTER 2: QUANTISATION FORMATS -->
-            <article id="chapter2">
-                <span class="book-badge">Chapter 2</span>
-                <h2>LLM Quantisation Formats under the Hood</h2>
-                <p>To deploy LLMs efficiently, we must move past standard FP16 floating-point formats. Autoregressive decoding is strictly memory-bandwidth bound--your GPU tensor cores sit idle waiting for weights to travel from high-bandwidth memory (HBM) to on-chip SRAM cache. Quantisation directly reduces weight sizes to speed up memory transfer.</p>
-
-                <h3>Mathematical Foundations</h3>
-                <p>Quantisation maps continuous, high-precision weights \(w \in \mathbb{R}\) into discrete, lower-precision integers \(q \in \mathbb{Z}\). In asymmetric (affine) quantisation, this mapping is established via a positive scale factor \(S \in \mathbb{R}^+\) and an integer zero-point \(Z \in \mathbb{Z}\):</p>
-                
+                <h4>2. Visual Patch Projection Layers</h4>
+                <p>The visual patch embeddings cannot be fed directly into the language model because their dimensionality (\(d_{\text{vision}}\)) does not match the LLM's hidden layer dimension (\(d_{\text{LLM}}\), which is \(2048\) for Gemma 2 2B or \(3584\) for Gemma 2 9B). To align the visual tokens with the textual embedding space, a <strong>Multimodal Projector</strong> is used. In Gemma 2 Vision, this is implemented as a 2-layer Multi-Layer Perceptron (MLP) with SwiGLU or GELU activation:</p>
                 <div class="math-block">
-                    <strong>Asymmetric (Affine) Quantisation Formula:</strong>
-                    $$q = \text{clip}\left(\text{round}\left(\frac{w}{S}\right) + Z, \ q_{\min}, \ q_{\max}\right)$$
-                    
-                    <strong>Dequantisation Formula (Restoring Approximated Weights):</strong>
-                    $$\tilde{w} = S \times (q - Z) \approx w$$
-
-                    <strong>Scale factor \(S\) and Zero-Point \(Z\) Derivation:</strong>
-                    $$S = \frac{w_{\max} - w_{\min}}{q_{\max} - q_{\min}} \quad ; \quad Z = \text{round}\left( q_{\min} - \frac{w_{\min}}{S} \right)$$
-                    
-                    Where \([w_{\min}, w_{\max}]\) is the clipping range of real weights, and \([q_{\min}, q_{\max}]\) is the target range of quantized integer bins (e.g., \([0, 15]\) for 4-bit unsigned integers or \([-8, 7]\) for 4-bit signed integers).
+                    $$X_{\text{projected}} = W_2 \cdot \text{Act}(W_1 \cdot H_{\text{vision}} + b_1) + b_2$$
+                    Where:
+                    <ul>
+                        <li>\(H_{\text{vision}} \in \mathbb{R}^{729 \times d_{\text{vision}}}\) is the matrix of raw vision patch embeddings.</li>
+                        <li>\(W_1 \in \mathbb{R}^{d_{\text{vision}} \times d_{\text{proj}}}\) and \(W_2 \in \mathbb{R}^{d_{\text{proj}} \times d_{\text{LLM}}}\) are learnable projection matrices (often \(d_{\text{proj}} = 4 \times d_{\text{LLM}}\)).</li>
+                        <li>\(\text{Act}\) is the activation function (e.g., GELU).</li>
+                        <li>\(X_{\text{projected}} \in \mathbb{R}^{729 \times d_{\text{LLM}}}\) is the final sequence of visual patch embeddings aligned with the text latent space.</li>
+                    </ul>
                 </div>
 
-                <h3>Traditional formats &amp; Activations Outliers</h3>
-                <p><strong>The Outlier Crisis:</strong> When LLMs exceed 6.7B parameters, specific activation channels begin emitting massive magnitude outliers (e.g. 100x larger than average). In symmetric quantisation, the scale factor \(S\) is forced to expand to accommodate these outliers, crushing the representational capacity of standard values to just a few integers (like -1, 0, 1), destroying model accuracy.</p>
+                <h4>3. Interleaved Text and Image Representation</h4>
+                <p>Visual tokens are interleaved with text tokens dynamically in the input sequence. Special boundary tokens are wrapped around visual sequences to let the causal decoder recognize sensory boundaries:</p>
+                <div class="math-block">
+                    $$\text{Input Sequence} = \left[ \langle\text{bos}\rangle, \dots, \text{text tokens}, \langle\text{image}\rangle, v_1, v_2, \dots, v_{729}, \langle\text{/image}\rangle, \text{text tokens} \right]$$
+                </div>
+                <p>In adaptive-resolution variants (such as processing high-resolution images), the model splits a large image (e.g., \(896 \times 896\)) into multiple \(384 \times 384\) tiles plus a downscaled global thumbnail. Each tile is processed independently by SigLIP, projected, and interleaved with custom row/column delimiter tokens:</p>
+                <div class="math-block">
+                    $$N_{\text{total\_visual\_tokens}} = (N_{\text{tiles}} + 1) \times 729 + N_{\text{delimiters}}$$
+                </div>
+                <p>For a 4-tile high-resolution image, this results in over \(3,645\) visual tokens, requiring substantial KV cache capacity and VRAM allocations during serving.</p>
 
-                <h3>Advanced Formats Bibliography</h3>
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Quantization Format</th>
-                                <th>Main Author / Group</th>
-                                <th>Affiliation</th>
-                                <th>Paper Title</th>
-                                <th>Publishing Venue / Year</th>
-                                <th>Direct Link</th>
-                                <th>Core Algorithmic Focus</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>LLM.int8()</strong></td>
-                                <td>Tim Dettmers et al.</td>
-                                <td>University of Washington</td>
-                                <td><em>LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale</em></td>
-                                <td>NeurIPS 2022</td>
-                                <td><a href="https://arxiv.org/abs/2208.07339" target="_blank">arXiv:2208.07339</a></td>
-                                <td>Identifies emergent activation outliers ($>6.7\text{B}$) and separates them into FP16 computation branches.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>AWQ</strong></td>
-                                <td>Ji Lin et al.</td>
-                                <td>MIT</td>
-                                <td><em>AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration</em></td>
-                                <td>MLSys 2024</td>
-                                <td><a href="https://arxiv.org/abs/2306.00978" target="_blank">arXiv:2306.00978</a></td>
-                                <td>Offline search for weight coordinate scaling multipliers to protect top 1% salient activation channels.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>GPTQ</strong></td>
-                                <td>Elias Frantar et al.</td>
-                                <td>IST Austria &amp; ETH Zurich</td>
-                                <td><em>GPTQ: Accurate Post-Training Quantization for Generative Pre-trained Transformers</em></td>
-                                <td>ICLR 2023</td>
-                                <td><a href="https://arxiv.org/abs/2210.17323" target="_blank">arXiv:2210.17323</a></td>
-                                <td>Inverse-Hessian second-order error correction using Cholesky precomputation and lazy updates.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>QLoRA (NF4)</strong></td>
-                                <td>Tim Dettmers et al.</td>
-                                <td>University of Washington</td>
-                                <td><em>QLoRA: Efficient Finetuning of Quantized LLMs</em></td>
-                                <td>NeurIPS 2023</td>
-                                <td><a href="https://arxiv.org/abs/2305.14314" target="_blank">arXiv:2305.14314</a></td>
-                                <td>Quantile-based NormalFloat4 representation with Double Quantization to compress scale footprints.</td>
-                            </tr>
-                            <tr>
-                                <td><strong>SmoothQuant</strong></td>
-                                <td>Guangxuan Xiao et al.</td>
-                                <td>MIT &amp; NVIDIA</td>
-                                <td><em>SmoothQuant: Accurate and Efficient Post-Training Quantization for LLMs</em></td>
-                                <td>ICML 2023</td>
-                                <td><a href="https://arxiv.org/abs/2211.10438" target="_blank">arXiv:2211.10438</a></td>
-                                <td>Dynamically migrates activation outlier scale to static weight channels using an offline hyperparameter.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <h3>Agentic Dataset Synthesis with Google Antigravity (AGY)</h3>
+                <p>For high-fidelity training data that captures nuanced human communication styles, static templates fall short. Google Antigravity (AGY) offers a powerful alternative: using autonomous agents acting as a <strong>Producer Archetype</strong> to generate highly varied, schema-compliant, and diverse datasets.</p>
+
+                <div class="note-box" style="background-color: var(--primary-light); border-left: 4px solid var(--primary); padding: 1rem; border-radius: 4px; margin-bottom: 2rem;">
+                    <strong>Setup and Execution:</strong>
+                    <ul style="margin-top: 0.5rem; margin-bottom: 0;">
+                        <li><strong>Antigravity CLI:</strong> Run <code>agy</code> in your terminal.</li>
+                        <li><strong>Antigravity 2.0 (UI):</strong> Launch the Desktop Client and open your project folder to grant workspace access.</li>
+                    </ul>
                 </div>
 
-                <h3>The GGUF File Format &amp; Binary Layout</h3>
-                <p>The <strong>GGUF (GPT-Generated Unified Format)</strong> is a single-file binary serialization format designed for fast memory-mapped (<code>mmap</code>) loading and high-performance inference with runtimes like <code>llama.cpp</code>. Unlike older formats, GGUF aligns all tensor data to pre-configured byte boundaries (typically 32 or 64 bytes) to satisfy CPU and GPU SIMD register alignment requirements, completely bypassing runtime deserialization copy cycles.</p>
-                
-                <div class="code-header"><span>GGUF Physical Binary Layout</span></div>
-                <pre><code class="language-text">
-+--------------------------------------------------------------+
-|                         GGUF FILE HEADER                     |
-|  Magic Number (4 bytes): "GGUF" (0x46554747)                 |
-|  Version (4 bytes): uint32_t (e.g., 3)                       |
-|  Tensor Count (8 bytes): uint64_t                            |
-|  Metadata KV Count (8 bytes): uint64_t                       |
-+--------------------------------------------------------------+
-|                      METADATA KV PAIRS                       |
-|  +--------------------------------------------------------+  |
-|  | KV Pair #1:                                            |  |
-|  | - Key (String: uint64_t length + UTF-8 raw bytes)      |  |
-|  | - Type (uint32_t): e.g., GGUF_TYPE_STRING             |  |
-|  | - Value: "Gemma-2-9b-it"                               |  |
-|  +--------------------------------------------------------+  |
-|  | KV Pair #2:                                            |  |
-|  | - Key: "general.architecture"                          |  |
-|  | - Type: GGUF_TYPE_STRING                               |  |
-|  | - Value: "gemma2"                                      |  |
-|  +--------------------------------------------------------+  |
-|  | ... (Repeated KV Count times)                          |  |
-+--------------------------------------------------------------+
-|                         TENSOR INFO                          |
-|  +--------------------------------------------------------+  |
-|  | Tensor Info #1 (e.g., "token_embd.weight"):            |  |
-|  | - Name (String: uint64_t length + raw bytes)            |  |
-|  | - Dimensions Count (uint32_t): e.g., 2                 |  |
-|  | - Dimensions (array of uint64_t): [256000, 3072]       |  |
-|  | - GGML Type (uint32_t): e.g., GGML_TYPE_Q4_K           |  |
-|  | - Offset (uint64_t): byte offset from raw data start   |  |
-|  +--------------------------------------------------------+  |
-|  | ... (Repeated Tensor Count times)                      |  |
-+--------------------------------------------------------------+
-|                         ALIGNMENT PADDING                    |
-|  Zeros added to pad the stream to global alignment block     |
-|  (typically aligned to 32 or 64 bytes for AVX/NEON/CUDA)     |
-+--------------------------------------------------------------+
-|                    BINARY TENSOR DATA BLOCKS                  |
-|  +--------------------------------------------------------+  |
-|  | Raw Tensor 1 Data (e.g. quantized Q4_K blocks)         |  |
-|  +--------------------------------------------------------+  |
-|  | Padding bytes for Alignment                            |  |
-|  +--------------------------------------------------------+  |
-|  | Raw Tensor 2 Data                                      |  |
-|  +--------------------------------------------------------+  |
-|  | ...                                                    |  |
-+--------------------------------------------------------------+
-                </code></pre>
+                <h3>Four Enterprise Dataset Synthesis Prompts</h3>
+                <p>These four prompts can be copied and pasted directly into AGY to generate high-value, production-grade custom datasets:</p>
 
-                <p>The GGUF binary block is split into the following sequential regions:</p>
-                <ol>
-                    <li><strong>Magic Header (24 bytes):</strong> Begins with the magic number <code>0x46554747</code> (the ASCII string "GGUF") followed by format version, tensor count, and key-value metadata count.</li>
-                    <li><strong>Metadata KV Pairs:</strong> Self-documenting config pairs. Each key is serialized as a <code>uint64_t</code> string length and raw UTF-8 bytes. The value type is specified by a <code>uint32_t</code> identifier.</li>
-                    <li><strong>Tensor Info Block:</strong> A detailed dictionary describing every tensor, including its name, dimension counts, dimensions arrays, GGML quantisation type (e.g. Q4_K, FP16), and exact byte offset.</li>
-                    <li><strong>Alignment Padding:</strong> Metadata blocks are padded with zeros to ensure the tensor payload begins exactly on a 32 or 64-byte boundary. This allows the file to be direct-mapped using the <code>mmap()</code> system call for hardware SIMD registers execution.</li>
-                    <li><strong>Binary Tensor Data Blocks:</strong> Raw quantized weights packed sequentially, padded individually to satisfy memory boundaries.</li>
-                </ol>
+                <div style="display: flex; flex-direction: column; gap: 2.5rem; margin-top: 2rem;">
+                    <!-- Use Case 1 -->
+                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">1. Sarcastic Sentiment &amp; Emotion Classifier</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train a classifier to identify subtle sarcasm, double-negations, and frustrated tones.</p>
+                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
+Task: Create a synthetic fine-tuning dataset of 1000 highly varied sentiment and emotional classification samples.
+Constraints:
+- Out of these, 400 must contain subtle sarcasm, 200 mixed-sentiments, 200 double-negations, and 200 realistic typos/slang.
+- Target sentiment classes: "Positive", "Negative", "Sarcastic", "Frustrated".
+- Format: Save the output directly as a JSON Lines (.jsonl) file in my current workspace named `sentiment_dataset.jsonl`.
+- Schema: Every line must be a single JSON object matching this structure exactly:
+  {"messages": [{"role": "user", "content": "Classify the sentiment: '&lt;REVIEW_TEXT&gt;'"}, {"role": "model", "content": "&lt;LABEL&gt;"}]}
 
-                <h3>Practical Quantization Implementations</h3>
-                
-                <div class="code-header"><span>HuggingFace Loading (bitsandbytes INT8/NF4)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
-                <pre><code class="language-python">import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-
-model_id = "google/gemma-2-9b-it"
-
-# Configure 4-bit NormalFloat (NF4) quantization with double quantization
-quantization_config = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_use_double_quant=True,
-    bnb_4bit_compute_dtype=torch.bfloat16
-)
-
-tokenizer = AutoTokenizer.from_pretrained(model_id)
-model = AutoModelForCausalLM.from_pretrained(
-    model_id,
-    quantization_config=quantization_config,
-    device_map="auto"
-)</code></pre>
-
-                <div class="code-header"><span>vLLM Serving (AWQ Quantized Model)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
-                <pre><code class="language-python">from vllm import LLM, SamplingParams
-
-# Initialize vLLM with an offline-compiled AWQ model
-llm = LLM(
-    model="google/gemma-2-9b-it-awq",
-    quantization="awq",
-    tensor_parallel_size=1
-)
-
-sampling_params = SamplingParams(temperature=0.7, top_p=0.9, max_tokens=128)
-outputs = llm.generate(["Explain quantization in one sentence."], sampling_params)
-print(outputs[0].outputs[0].text)</code></pre>
-
-                <div class="code-header"><span>Transformers Loading (AutoGPTQ)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
-                <pre><code class="language-python">import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-quantized_model_dir = "TheBloke/gemma-2-9b-it-GPTQ"
-tokenizer = AutoTokenizer.from_pretrained(quantized_model_dir, use_fast=True)
-
-model = AutoModelForCausalLM.from_pretrained(
-    quantized_model_dir,
-    device_map="auto",
-    torch_dtype=torch.float16
-)</code></pre>
-
-                <div class="code-header"><span>Compiling &amp; Quantizing via llama.cpp (GGUF)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
-                <pre><code class="language-bash"># Clone and compile llama.cpp
-git clone https://github.com/ggerganov/llama.cpp
-cd llama.cpp && make -j
-
-# Convert HuggingFace checkpoint to GGUF FP16 format
-python3 convert_hf_to_gguf.py /path/to/gemma-2-9b-it/ \
-    --outtype f16 \
-    --outfile gemma-2-9b-it.f16.gguf
-
-# Quantize the FP16 GGUF to Q4_K_M (4-bit Medium) format
-./llama-quantize gemma-2-9b-it.f16.gguf gemma-2-9b-it.Q4_K_M.gguf Q4_K_M</code></pre>
-
-
-                <!-- CHAPTER 2 QUIZ -->
-                <div class="quiz-container">
-                    <div class="quiz-question">Knowledge Check: Why is NF4 (NormalFloat4) considered mathematically superior to standard INT4 for weight-only quantisation in QLoRA?</div>
-                    <div class="quiz-options">
-                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. NF4 does not accelerate math; it is converted back to FP16/BF16 at runtime during forward passes.')">
-                            A) It utilizes native integer-based ALUs on mobile devices to bypass GPU hardware limits.
-                        </div>
-                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Spot on! NF4 allocates quantisation boundaries based on standard normal distributions, maximising entropy and ensuring every bin has equal capacity for normally-distributed weights.')">
-                            B) It maps quantization bins to equal-area intervals of a normal distribution, maximizing the Shannon entropy of the representation.
-                        </div>
-                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. AWQ and GPTQ rely on activation datasets; NF4 is static and optimal for standard normal weight shapes.')">
-                            C) It calibrates dynamic scale factors on the fly based on a custom training dataset.
-                        </div>
+Begin generating now, ensuring diverse vocabulary across sectors (food, apps, hotels, tech gadgets). Avoid repeating review structures.</code></pre>
                     </div>
-                    <div class="quiz-feedback"></div>
+
+                    <!-- Use Case 2 -->
+                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">2. Multilingual Support Ticket Router</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train a gatekeeper model to route customer support tickets in multiple languages to structured JSON payloads.</p>
+                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
+Task: Create a synthetic fine-tuning dataset of 1000 customer support triage samples.
+Constraints:
+- The input review should be in random languages (English, Spanish, French, German, Japanese, Hindi).
+- The model must output a JSON block indicating category and priority.
+- Target Categories: "billing", "technical_support", "account_security", "refund_request".
+- Target Priorities: "critical", "high", "medium", "low".
+- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `triage_dataset.jsonl`.
+- Schema: Every line must be a single JSON object matching this structure exactly:
+  {"messages": [{"role": "user", "content": "Triage this support ticket: '&lt;TICKET_TEXT&gt;'"}, {"role": "model", "content": "{\\\"category\\\": \\\"&lt;CAT&gt;\\\", \\\"priority\\\": \\\"&lt;PRIORITY&gt;\\\"}"}]}
+
+Begin generating now, ensuring highly realistic support scenarios (e.g. payment failure, locked out of account, api latency, pricing query).</code></pre>
+                    </div>
+
+                    <!-- Use Case 3 -->
+                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">3. Text-to-API Payload Copilot</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train a text-to-API translation engine to output schema-compliant REST API JSON function calls.</p>
+                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
+Task: Create a synthetic fine-tuning dataset of 1000 Text-to-API function call translation samples.
+Constraints:
+- The user prompt should be a natural language request to perform an action (e.g., book a flight, update a user profile, send a notification).
+- The model response should be a formatted, structured REST API payload.
+- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `api_dataset.jsonl`.
+- Schema: Every line must be a single JSON object matching this structure exactly:
+  {"messages": [{"role": "user", "content": "Translate to API payload: '&lt;REQUEST_TEXT&gt;'"}, {"role": "model", "content": "{\\\"action\\\": \\\"&lt;ACTION&gt;\\\", \\\"params\\\": {&lt;PARAMETERS&gt;}}"}]}
+
+Ensure wide variety of operations (Create, Read, Update, Delete) across CRM, booking, and notification system paradigms.</code></pre>
+                    </div>
+
+                    <!-- Use Case 4 -->
+                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">4. Enterprise PII Redactor</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train Gemma to redact sensitive information (SSN, credit card, emails) from conversational chat histories.</p>
+                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
+Task: Create a synthetic fine-tuning dataset of 1000 PII anonymization samples.
+Constraints:
+- The input should be a conversational transcript containing names, credit card numbers, email addresses, phone numbers, or SSNs.
+- The model response must be the exact same transcript, but with all PII replaced by standardized tags like `[REDACTED_NAME]`, `[REDACTED_EMAIL]`, `[REDACTED_PHONE]`, `[REDACTED_CARD]`.
+- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `pii_dataset.jsonl`.
+- Schema: Every line must be a single JSON object matching this structure exactly:
+  {"messages": [{"role": "user", "content": "Redact PII from this transcript: '&lt;TRANSCRIPT&gt;'"}, {"role": "model", "content": "&lt;REDACTED_TRANSCRIPT&gt;"}]}
+
+Ensure diverse realistic chat snippets with conversational natural flow, typos, and varied customer service contexts.</code></pre>
+                    </div>
                 </div>
             </article>
 
 
             <!-- CHAPTER 3: FINE-TUNING & PEFT -->
             <article id="chapter3">
-                <span class="book-badge">Chapter 3</span>
+                <span class="book-badge">Chapter 2</span>
                 <h2>Fine-Tuning &amp; Parameter-Efficient Fine-Tuning (PEFT)</h2>
                 <p>Full parameter fine-tuning is computationally prohibitive. Backpropagation requires caching gradient activation graphs--allocating up to 4x the model's static weight memory during backward passes. PEFT methods bypass this restriction by freezing the base model and training tiny, low-rank matrices.</p>
 
@@ -2888,9 +2457,583 @@ if __name__ == "__main__":
             </article>
 
 
+            <!-- CHAPTER 2: QUANTISATION FORMATS -->
+            <article id="chapter2">
+                <span class="book-badge">Chapter 3</span>
+                <h2>LLM Quantisation Formats under the Hood</h2>
+                <p>To deploy LLMs efficiently, we must move past standard FP16 floating-point formats. Autoregressive decoding is strictly memory-bandwidth bound--your GPU tensor cores sit idle waiting for weights to travel from high-bandwidth memory (HBM) to on-chip SRAM cache. Quantisation directly reduces weight sizes to speed up memory transfer.</p>
+
+                <h3>Mathematical Foundations</h3>
+                <p>Quantisation maps continuous, high-precision weights \(w \in \mathbb{R}\) into discrete, lower-precision integers \(q \in \mathbb{Z}\). In asymmetric (affine) quantisation, this mapping is established via a positive scale factor \(S \in \mathbb{R}^+\) and an integer zero-point \(Z \in \mathbb{Z}\):</p>
+                
+                <div class="math-block">
+                    <strong>Asymmetric (Affine) Quantisation Formula:</strong>
+                    $$q = \text{clip}\left(\text{round}\left(\frac{w}{S}\right) + Z, \ q_{\min}, \ q_{\max}\right)$$
+                    
+                    <strong>Dequantisation Formula (Restoring Approximated Weights):</strong>
+                    $$\tilde{w} = S \times (q - Z) \approx w$$
+
+                    <strong>Scale factor \(S\) and Zero-Point \(Z\) Derivation:</strong>
+                    $$S = \frac{w_{\max} - w_{\min}}{q_{\max} - q_{\min}} \quad ; \quad Z = \text{round}\left( q_{\min} - \frac{w_{\min}}{S} \right)$$
+                    
+                    Where \([w_{\min}, w_{\max}]\) is the clipping range of real weights, and \([q_{\min}, q_{\max}]\) is the target range of quantized integer bins (e.g., \([0, 15]\) for 4-bit unsigned integers or \([-8, 7]\) for 4-bit signed integers).
+                </div>
+
+                <h3>Traditional formats &amp; Activations Outliers</h3>
+                <p><strong>The Outlier Crisis:</strong> When LLMs exceed 6.7B parameters, specific activation channels begin emitting massive magnitude outliers (e.g. 100x larger than average). In symmetric quantisation, the scale factor \(S\) is forced to expand to accommodate these outliers, crushing the representational capacity of standard values to just a few integers (like -1, 0, 1), destroying model accuracy.</p>
+
+                <h3>Advanced Formats Bibliography</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Quantization Format</th>
+                                <th>Main Author / Group</th>
+                                <th>Affiliation</th>
+                                <th>Paper Title</th>
+                                <th>Publishing Venue / Year</th>
+                                <th>Direct Link</th>
+                                <th>Core Algorithmic Focus</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>LLM.int8()</strong></td>
+                                <td>Tim Dettmers et al.</td>
+                                <td>University of Washington</td>
+                                <td><em>LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale</em></td>
+                                <td>NeurIPS 2022</td>
+                                <td><a href="https://arxiv.org/abs/2208.07339" target="_blank">arXiv:2208.07339</a></td>
+                                <td>Identifies emergent activation outliers ($>6.7\text{B}$) and separates them into FP16 computation branches.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>AWQ</strong></td>
+                                <td>Ji Lin et al.</td>
+                                <td>MIT</td>
+                                <td><em>AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration</em></td>
+                                <td>MLSys 2024</td>
+                                <td><a href="https://arxiv.org/abs/2306.00978" target="_blank">arXiv:2306.00978</a></td>
+                                <td>Offline search for weight coordinate scaling multipliers to protect top 1% salient activation channels.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>GPTQ</strong></td>
+                                <td>Elias Frantar et al.</td>
+                                <td>IST Austria &amp; ETH Zurich</td>
+                                <td><em>GPTQ: Accurate Post-Training Quantization for Generative Pre-trained Transformers</em></td>
+                                <td>ICLR 2023</td>
+                                <td><a href="https://arxiv.org/abs/2210.17323" target="_blank">arXiv:2210.17323</a></td>
+                                <td>Inverse-Hessian second-order error correction using Cholesky precomputation and lazy updates.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>QLoRA (NF4)</strong></td>
+                                <td>Tim Dettmers et al.</td>
+                                <td>University of Washington</td>
+                                <td><em>QLoRA: Efficient Finetuning of Quantized LLMs</em></td>
+                                <td>NeurIPS 2023</td>
+                                <td><a href="https://arxiv.org/abs/2305.14314" target="_blank">arXiv:2305.14314</a></td>
+                                <td>Quantile-based NormalFloat4 representation with Double Quantization to compress scale footprints.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>SmoothQuant</strong></td>
+                                <td>Guangxuan Xiao et al.</td>
+                                <td>MIT &amp; NVIDIA</td>
+                                <td><em>SmoothQuant: Accurate and Efficient Post-Training Quantization for LLMs</em></td>
+                                <td>ICML 2023</td>
+                                <td><a href="https://arxiv.org/abs/2211.10438" target="_blank">arXiv:2211.10438</a></td>
+                                <td>Dynamically migrates activation outlier scale to static weight channels using an offline hyperparameter.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>The GGUF File Format &amp; Binary Layout</h3>
+                <p>The <strong>GGUF (GPT-Generated Unified Format)</strong> is a single-file binary serialization format designed for fast memory-mapped (<code>mmap</code>) loading and high-performance inference with runtimes like <code>llama.cpp</code>. Unlike older formats, GGUF aligns all tensor data to pre-configured byte boundaries (typically 32 or 64 bytes) to satisfy CPU and GPU SIMD register alignment requirements, completely bypassing runtime deserialization copy cycles.</p>
+                
+                <div class="code-header"><span>GGUF Physical Binary Layout</span></div>
+                <pre><code class="language-text">
++--------------------------------------------------------------+
+|                         GGUF FILE HEADER                     |
+|  Magic Number (4 bytes): "GGUF" (0x46554747)                 |
+|  Version (4 bytes): uint32_t (e.g., 3)                       |
+|  Tensor Count (8 bytes): uint64_t                            |
+|  Metadata KV Count (8 bytes): uint64_t                       |
++--------------------------------------------------------------+
+|                      METADATA KV PAIRS                       |
+|  +--------------------------------------------------------+  |
+|  | KV Pair #1:                                            |  |
+|  | - Key (String: uint64_t length + UTF-8 raw bytes)      |  |
+|  | - Type (uint32_t): e.g., GGUF_TYPE_STRING             |  |
+|  | - Value: "Gemma-2-9b-it"                               |  |
+|  +--------------------------------------------------------+  |
+|  | KV Pair #2:                                            |  |
+|  | - Key: "general.architecture"                          |  |
+|  | - Type: GGUF_TYPE_STRING                               |  |
+|  | - Value: "gemma2"                                      |  |
+|  +--------------------------------------------------------+  |
+|  | ... (Repeated KV Count times)                          |  |
++--------------------------------------------------------------+
+|                         TENSOR INFO                          |
+|  +--------------------------------------------------------+  |
+|  | Tensor Info #1 (e.g., "token_embd.weight"):            |  |
+|  | - Name (String: uint64_t length + raw bytes)            |  |
+|  | - Dimensions Count (uint32_t): e.g., 2                 |  |
+|  | - Dimensions (array of uint64_t): [256000, 3072]       |  |
+|  | - GGML Type (uint32_t): e.g., GGML_TYPE_Q4_K           |  |
+|  | - Offset (uint64_t): byte offset from raw data start   |  |
+|  +--------------------------------------------------------+  |
+|  | ... (Repeated Tensor Count times)                      |  |
++--------------------------------------------------------------+
+|                         ALIGNMENT PADDING                    |
+|  Zeros added to pad the stream to global alignment block     |
+|  (typically aligned to 32 or 64 bytes for AVX/NEON/CUDA)     |
++--------------------------------------------------------------+
+|                    BINARY TENSOR DATA BLOCKS                  |
+|  +--------------------------------------------------------+  |
+|  | Raw Tensor 1 Data (e.g. quantized Q4_K blocks)         |  |
+|  +--------------------------------------------------------+  |
+|  | Padding bytes for Alignment                            |  |
+|  +--------------------------------------------------------+  |
+|  | Raw Tensor 2 Data                                      |  |
+|  +--------------------------------------------------------+  |
+|  | ...                                                    |  |
++--------------------------------------------------------------+
+                </code></pre>
+
+                <p>The GGUF binary block is split into the following sequential regions:</p>
+                <ol>
+                    <li><strong>Magic Header (24 bytes):</strong> Begins with the magic number <code>0x46554747</code> (the ASCII string "GGUF") followed by format version, tensor count, and key-value metadata count.</li>
+                    <li><strong>Metadata KV Pairs:</strong> Self-documenting config pairs. Each key is serialized as a <code>uint64_t</code> string length and raw UTF-8 bytes. The value type is specified by a <code>uint32_t</code> identifier.</li>
+                    <li><strong>Tensor Info Block:</strong> A detailed dictionary describing every tensor, including its name, dimension counts, dimensions arrays, GGML quantisation type (e.g. Q4_K, FP16), and exact byte offset.</li>
+                    <li><strong>Alignment Padding:</strong> Metadata blocks are padded with zeros to ensure the tensor payload begins exactly on a 32 or 64-byte boundary. This allows the file to be direct-mapped using the <code>mmap()</code> system call for hardware SIMD registers execution.</li>
+                    <li><strong>Binary Tensor Data Blocks:</strong> Raw quantized weights packed sequentially, padded individually to satisfy memory boundaries.</li>
+                </ol>
+
+                <h3>Practical Quantization Implementations</h3>
+                
+                <div class="code-header"><span>HuggingFace Loading (bitsandbytes INT8/NF4)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+model_id = "google/gemma-2-9b-it"
+
+# Configure 4-bit NormalFloat (NF4) quantization with double quantization
+quantization_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_compute_dtype=torch.bfloat16
+)
+
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    quantization_config=quantization_config,
+    device_map="auto"
+)</code></pre>
+
+                <div class="code-header"><span>vLLM Serving (AWQ Quantized Model)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">from vllm import LLM, SamplingParams
+
+# Initialize vLLM with an offline-compiled AWQ model
+llm = LLM(
+    model="google/gemma-2-9b-it-awq",
+    quantization="awq",
+    tensor_parallel_size=1
+)
+
+sampling_params = SamplingParams(temperature=0.7, top_p=0.9, max_tokens=128)
+outputs = llm.generate(["Explain quantization in one sentence."], sampling_params)
+print(outputs[0].outputs[0].text)</code></pre>
+
+                <div class="code-header"><span>Transformers Loading (AutoGPTQ)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+quantized_model_dir = "TheBloke/gemma-2-9b-it-GPTQ"
+tokenizer = AutoTokenizer.from_pretrained(quantized_model_dir, use_fast=True)
+
+model = AutoModelForCausalLM.from_pretrained(
+    quantized_model_dir,
+    device_map="auto",
+    torch_dtype=torch.float16
+)</code></pre>
+
+                <div class="code-header"><span>Compiling &amp; Quantizing via llama.cpp (GGUF)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-bash"># Clone and compile llama.cpp
+git clone https://github.com/ggerganov/llama.cpp
+cd llama.cpp && make -j
+
+# Convert HuggingFace checkpoint to GGUF FP16 format
+python3 convert_hf_to_gguf.py /path/to/gemma-2-9b-it/ \
+    --outtype f16 \
+    --outfile gemma-2-9b-it.f16.gguf
+
+# Quantize the FP16 GGUF to Q4_K_M (4-bit Medium) format
+./llama-quantize gemma-2-9b-it.f16.gguf gemma-2-9b-it.Q4_K_M.gguf Q4_K_M</code></pre>
+
+
+                <!-- CHAPTER 2 QUIZ -->
+                <div class="quiz-container">
+                    <div class="quiz-question">Knowledge Check: Why is NF4 (NormalFloat4) considered mathematically superior to standard INT4 for weight-only quantisation in QLoRA?</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. NF4 does not accelerate math; it is converted back to FP16/BF16 at runtime during forward passes.')">
+                            A) It utilizes native integer-based ALUs on mobile devices to bypass GPU hardware limits.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Spot on! NF4 allocates quantisation boundaries based on standard normal distributions, maximising entropy and ensuring every bin has equal capacity for normally-distributed weights.')">
+                            B) It maps quantization bins to equal-area intervals of a normal distribution, maximizing the Shannon entropy of the representation.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. AWQ and GPTQ rely on activation datasets; NF4 is static and optimal for standard normal weight shapes.')">
+                            C) It calibrates dynamic scale factors on the fly based on a custom training dataset.
+                        </div>
+                    </div>
+                    <div class="quiz-feedback"></div>
+                </div>
+            </article>
+
+
+            <!-- CHAPTER 1: MODEL RUNTIMES -->
+            <article id="chapter1">
+                <span class="book-badge">Chapter 4</span>
+                <h2>Mainstream Model Runtimes &amp; Inference Engines</h2>
+                <p>The runtime you wrap around model weights dictates your serving efficiency. In server-side serving, memory throughput determines single-stream speed, while batch execution models dictate overall concurrent requests capacities. Let's inspect the six mainstream open architectures.</p>
+
+                <h3>1. vLLM: High-Concurrency Cloud Serving</h3>
+                <p><strong>Under the Hood:</strong> vLLM is an engine designed specifically for high-concurrency server deployments. Its core innovation is <strong>PagedAttention</strong> (Kwon et al., 2023). Traditional transformers pre-allocate static memory for the Key-Value (KV) cache of every sequence based on maximum context lengths. This design fragments memory up to 80% with unused gaps (internal, external, and reservation overheads). PagedAttention behaves like virtual paging in operating systems--dividing the KV cache of each sequence into fixed-size physical blocks mapped dynamically, liberating VRAM to scale batch sizes by 10x without memory exhaustion.</p>
+                
+                <h4>Logical-to-Physical Block Translation</h4>
+                <p>Let $s$ represent a sequence. The key-value states for token position $i$ are mapped to a specific physical block and slot index within that block:</p>
+                <ul>
+                    <li><strong>Block Size ($B$):</strong> The fixed number of tokens per block (typically $B = 16$ or $B = 32$).</li>
+                    <li><strong>Logical Block Index ($lb$):</strong> The index of the block in the sequence's logical timeline:
+                        <div class="math-block" style="text-align: center;">
+                            $$lb = \lfloor i / B \rfloor$$
+                        </div>
+                    </li>
+                    <li><strong>Block Offset / Slot Index ($offset$):</strong> The position of the token within its block:
+                        <div class="math-block" style="text-align: center;">
+                            $$offset = i \pmod B$$
+                        </div>
+                    </li>
+                    <li><strong>Block Table Function ($\mathcal{M}(s, lb)$):</strong> A mapping table maintained by the vLLM scheduler that translates the logical block index $lb$ of sequence $s$ to a physical block frame number $P \in \mathbb{N}$ in GPU VRAM:
+                        <div class="math-block" style="text-align: center;">
+                            $$\mathcal{M}(s, \lfloor i / B \rfloor) = P$$
+                        </div>
+                    </li>
+                </ul>
+                <p>The physical address of the key or value vector for token $i$ at layer $l$ is calculated dynamically as:</p>
+                <div class="math-block" style="text-align: center;">
+                    $$\text{Physical Address}(i, l) = \text{BaseAddress}\left(\mathcal{M}\left(s, \lfloor i / B \rfloor\right)\right) + (i \pmod B) \times \text{SlotSize}_l$$
+                </div>
+                <p>Where the slot size (in bytes) is:
+                    $$\text{SlotSize}_l = 2 \times H_{kv} \times D_{\text{head}} \times 2 \text{ bytes (for FP16/BF16)}$$
+                </p>
+                <p>Here, the leading multiplier $2$ accounts for the separate storage of both the Key and Value vectors for each token. $H_{kv}$ represents the number of Key-Value attention heads standard in Grouped-Query Attention (GQA), which is typically smaller than the number of Query attention heads (e.g., 4 or 8 in Gemma 2/4). This distinction prevents severe overestimation of physical memory requirements.</p>
+
+                <h4>Attention Computation using PagedAttention</h4>
+                <p>During the decoding phase, when a new query token $q_i$ arrives, the attention score $A_{i, j}$ between $q_i$ and all historical key tokens $k_j$ ($j \le i$) is computed. Instead of assuming linear memory layout, the custom CUDA attention kernel loops over physical pages:</p>
+                <div class="math-block" style="text-align: center;">
+                    $$A_{i, j} = \frac{q_i \cdot K[\mathcal{M}(s, \lfloor j/B \rfloor), j \pmod B]^T}{\sqrt{D_{\text{head}}}}$$
+                </div>
+                <p>Where $K[P, offset]$ directly accesses the physical memory offset within page $P$ on the GPU. This eliminates contiguous memory constraints completely, reducing KV cache fragmentation to less than 4% of total VRAM.</p>
+
+                <h4>Copy-on-Write (CoW) for Parallel Sampling</h4>
+                <p>PagedAttention enables efficient prompt sharing during parallel sampling or beam search. When generating multiple responses from a single prompt, the prompt’s physical blocks are shared across sequences. When a shared block requires editing (e.g., if writing new tokens to a partially-filled block), the vLLM scheduler increments the reference count. If multiple sequences write to a shared block, the scheduler copies the block's physical content to a new frame, decrements the reference count of the old frame, and maps the sequence to the new frame. This <strong>Copy-on-Write (CoW)</strong> allocation allows zero-overhead multi-candidate sampling.</p>
+
+                <p><strong>Deployment Stack:</strong> Best-suited for hosting OpenAI-compatible endpoints on discrete GPUs in GCP GKE or Cloud Run. For more information, refer to the <a href="https://docs.vllm.ai/en/latest/" target="_blank">Official vLLM Documentation</a>.</p>
+                
+                <div class="code-header"><span>vLLM Serving Startup CLI</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-bash"># Serve Gemma 4 E4B Instruct with on-the-fly FP8 quantisation
+python3 -m vllm.entrypoints.openai.api_server \
+    --model google/gemma-4-e4b-it \
+    --quantization fp8 \
+    --enable-prefix-caching \
+    --gpu-memory-utilization 0.90 \
+    --port 8000</code></pre>
+
+                <h3>2. Hugging Face Transformers</h3>
+                <p><strong>Under the Hood:</strong> Hugging Face remains the absolute gold standard for developer research, prototyping, and PEFT adapter integration. It is a highly modular, PyTorch-native abstraction layer. Although uncompiled dynamic graph execution in PyTorch introduces minor latency, modern Transformers optimizes this out via <strong>Scaled Dot-Product Attention (SDPA)</strong>, <code>bitsandbytes</code> quantisation bindings, and direct model compilation on Hugging Face <code>optimum</code>.</p>
+                <p>To learn more, check out the <a href="https://huggingface.co/docs/transformers/index" target="_blank">Official HF Transformers Docs</a> and the <a href="https://huggingface.co/docs/peft/index" target="_blank">Official HF PEFT Docs</a>.</p>
+                
+                <div class="code-header"><span>Hugging Face Transformers Generation</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+# Configure 4-bit NormalFloat quantisation for VRAM containment
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.float16
+)
+
+tokenizer = AutoTokenizer.from_pretrained("google/gemma-4-e2b-it")
+model = AutoModelForCausalLM.from_pretrained(
+    "google/gemma-4-e2b-it",
+    quantization_config=bnb_config,
+    device_map="auto"
+)
+
+messages = [{"role": "user", "content": "How do you avoid VRAM fragmentation?"}]
+prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+
+with torch.no_grad():
+    outputs = model.generate(**inputs, max_new_tokens=256)
+print(tokenizer.decode(outputs[0], skip_special_tokens=True))</code></pre>
+
+                <h3>3. Apple MLX</h3>
+                <p><strong>Under the Hood:</strong> MLX is Apple's specialized array framework tailored natively for Apple Silicon (M1/M2/M3/M4 chips). It bypasses standard GPU/CPU system data transfer structures entirely by exploiting Apple's <strong>Unified Memory Architecture (UMA)</strong>. The CPU and GPU share a single physical memory pool--enabling Zero-Copy mechanics where weights loaded onto Apple Silicon require zero bus overhead or copying step between processing elements.</p>
+                <ul>
+                    <li><strong>Zero-Copy Performance:</strong> Loading a 4-bit quantized Gemma model into MLX maps the weights directly from disk into Unified Memory. The weights are read by GPU computing kernels directly, completely eliminating memory duplication and copy overhead.</li>
+                    <li><strong>Lazy Evaluation:</strong> MLX uses a lazy evaluation engine. No calculations are executed when code is written; instead, MLX builds a directed acyclic graph (DAG) of the operations. Execution is deferred until the user explicitly reads or prints the array contents, enabling deep graph-level compiler optimizations.</li>
+                </ul>
+                <p>For official examples and APIs, see the <a href="https://github.com/ml-explore/mlx" target="_blank">Official Apple MLX Repository</a> and the <a href="https://github.com/ml-explore/mlx-examples/tree/main/llms" target="_blank">Official MLX-LM Framework Examples</a>.</p>
+
+                <div class="code-header"><span>Complete MLX Inference & Low-Level Dequantization Script</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import mlx.core as mx
+import mlx.nn as nn
+from mlx_lm import load, generate
+
+def run_high_level_mlx():
+    """
+    Demonstrates native zero-copy loading and generation using mlx-lm.
+    """
+    # Load 4-bit quantized Gemma model from HF. 
+    # MLX-LM automatically utilizes Apple Unified Memory with zero-copy loading.
+    model_id = "mlx-community/gemma-2-9b-it-4bit"
+    print(f"[MLX] Loading native 4-bit model from: {model_id}")
+    
+    model, tokenizer = load(model_id)
+    
+    # Format prompt using Gemma's chat template
+    messages = [{"role": "user", "content": "Explain unified memory in Apple Silicon."}]
+    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    
+    print("[MLX] Starting zero-copy inference execution...\n")
+    # Generates tokens dynamically with GPU acceleration
+    response = generate(
+        model=model,
+        tokenizer=tokenizer,
+        prompt=prompt,
+        max_tokens=200,
+        temp=0.7,
+        verbose=True
+    )
+    return response
+
+
+class MLXQuantizedLinear(nn.Module):
+    """
+    Under-the-hood representation of how MLX performs 4-bit dequantization
+    and matrix multiplication directly in Apple Unified Memory.
+    """
+    def __init__(self, in_features: int, out_features: int, bits: int = 4, group_size: int = 64):
+        super().__init__()
+        self.bits = bits
+        self.group_size = group_size
+        self.in_features = in_features
+        self.out_features = out_features
+        
+        # In MLX, quantized weights are stored as uint32 indices alongside scale and bias vectors
+        # All allocations are initialized directly in Unified Memory.
+        self.weight = mx.zeros((out_features, in_features // (32 // bits)), dtype=mx.uint32)
+        self.scales = mx.zeros((out_features, in_features // group_size), dtype=mx.float16)
+        self.biases = mx.zeros((out_features, in_features // group_size), dtype=mx.float16)
+
+    def __call__(self, x: mx.array) -> mx.array:
+        """
+        Runs on-the-fly dequantization and matmul within GPU unified memory.
+        """
+        # mx.quantized_matmul compiles into custom Metal Shading Language (MSL) kernels,
+        # executing dequantization directly inside the GPU registers to avoid VRAM bandwidth bottlenecks.
+        return mx.quantized_matmul(
+            x, 
+            self.weight, 
+            self.scales, 
+            self.biases, 
+            transpose=True, 
+            bits=self.bits, 
+            group_size=self.group_size
+        )
+
+if __name__ == "__main__":
+    # Run high-level inference demonstration
+    run_high_level_mlx()</code></pre>
+
+                <h3>4. Google LiteRT &amp; LiteRT-LM</h3>
+                <p><strong>Under the Hood:</strong> LiteRT (formerly TensorFlow Lite) is Google's high-efficiency on-device runtime. By compiling model graphs down into flatbuffer schema files (<code>.tflite</code> / <code>.litertlm</code>), it strips Python dependencies and compiles optimized execution nodes for local NPUs, Android/iOS devices, or edge browsers using hardware-level backends like XNNPACK or WebGPU.</p>
+                <ul>
+                    <li><strong>Flatbuffer Serialization:</strong> Packaging the compiled network graph, fused operators, and quantized weights into a single binary flatbuffer schema file (<code>.task</code> / <code>.tflite</code>). This enables zero-copy deserialization where weights are mapped directly into system memory, avoiding allocation overhead.</li>
+                    <li><strong>Operator Fusion:</strong> Complex operations like multi-head attention (MHA) and layer normalization are fused into single highly-optimized kernels to eliminate runtime dispatch latency.</li>
+                </ul>
+                <p>For more information, see the <a href="https://ai.google.dev/edge/litert" target="_blank">Official Google LiteRT-LM Documentation</a>.</p>
+
+                <div class="code-header"><span>LiteRT-LM Python On-Device Inference</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import os
+import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import text
+
+def run_litert_inference():
+    # Path to the compiled LiteRT flatbuffer LLM task
+    # This file contains the fused model graph and 4-bit quantized Gemma weights.
+    model_path = "gemma-2b-it-gpu.task"
+    
+    if not os.path.exists(model_path):
+        print(f"Please compile or download the LiteRT model to '{model_path}' before running.")
+        return
+
+    print(f"[LiteRT-LM] Initializing LLM engine from: {model_path}")
+    
+    # Configure options with hardware delegation (Metal on macOS, OpenCL/Vulkan on Android)
+    options = text.LlmInference.Options(
+        model_path=model_path,
+        max_results=256,
+        temperature=0.7,
+        top_k=40,
+    )
+    
+    # Initialize the generator task
+    with text.LlmInference.create_from_options(options) as generator:
+        prompt = "Define the purpose of a flatbuffer format in edge AI."
+        print(f"\nPrompt: {prompt}\n")
+        
+        # 1. Synchronous generation
+        response = generator.generate_response(prompt)
+        print(f"Response: {response}\n")
+        
+        # 2. Asynchronous / Streaming generation demonstration
+        print("Streaming response:")
+        def stream_callback(partial_text, done):
+            print(partial_text, end="", flush=True)
+            
+        generator.generate_response_async(
+            "List three key features of LiteRT-LM.", 
+            stream_callback
+        )
+        print()
+
+if __name__ == "__main__":
+    run_litert_inference()</code></pre>
+
+                <div class="code-header"><span>LiteRT-LM C++ Low-Latency Inference</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include "mediapipe/tasks/cc/text/llm_inference/llm_inference.h"
+
+using namespace mediapipe::tasks::text::llm_inference;
+
+int main() {
+    // 1. Initialize LiteRT-LM configuration options
+    LlmInference::Options options;
+    options.model_path = "/var/mobile/gemma-2b-it-gpu.task";
+    options.max_results = 256;
+    options.temperature = 0.7;
+    options.top_k = 40;
+
+    // 2. Instantiate the inference engine
+    std::cout &lt;&lt; "Loading LiteRT-LM model..." &lt;&lt; std::endl;
+    auto generator = LlmInference::CreateFromOptions(options);
+    if (!generator.ok()) {
+        std::cerr &lt;&lt; "Initialization failed: " &lt;&lt; generator.status().message() &lt;&lt; std::endl;
+        return -1;
+    }
+
+    // 3. Run synchronous inference
+    std::string prompt = "Explain on-device quantization.";
+    std::cout &lt;&lt; "\nPrompt: " &lt;&lt; prompt &lt;&lt; std::endl;
+    
+    auto response = (*generator)-&gt;GenerateResponse(prompt);
+    if (response.ok()) {
+        std::cout &lt;&lt; "Response:\n" &lt;&lt; *response &lt;&lt; std::endl;
+    } else {
+        std::cerr &lt;&lt; "Inference failed: " &lt;&lt; response.status().message() &lt;&lt; std::endl;
+    }
+
+    return 0;
+}</code></pre>
+
+                <h3>5. llama.cpp &amp; Ollama</h3>
+                <p><strong>Under the Hood:</strong> <code>llama.cpp</code> is a pure, zero-dependency C/C++ implementation of the transformer architecture designed by Georgi Gerganov. It is the absolute king of local CPU/GPU cross-platform execution. It maps model weights directly using <strong>mmap</strong> (avoiding virtual memory indexing bloat) and parses highly compressed <strong>GGUF</strong> files. <strong>Ollama</strong> runs a Go-based background daemon on top of llama.cpp, automating layer offloading and API serving.</p>
+                <p>Check out the <a href="https://github.com/ggerganov/llama.cpp" target="_blank">Official llama.cpp GitHub Repository</a> to get started.</p>
+
+                <!-- RUNTIMES COMPARISON TABLE -->
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Runtime Engine</th>
+                            <th>Target HW</th>
+                            <th>Memory Overhead</th>
+                            <th>Relative Throughput</th>
+                            <th>Primary Quantisation</th>
+                            <th>Ideal Use Case</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>vLLM</strong></td>
+                            <td>discrete GPU</td>
+                            <td>High (Pre-allocates cache)</td>
+                            <td>Ultra-High (10x concurrency)</td>
+                            <td>AWQ, GPTQ, FP8</td>
+                            <td>High-scale Cloud Serving APIs</td>
+                        </tr>
+                        <tr>
+                            <td><strong>HF Transformers</strong></td>
+                            <td>CUDA, ROCm, CPU</td>
+                            <td>Medium</td>
+                            <td>Low-Medium</td>
+                            <td>NF4, double quant, INT8</td>
+                            <td>Prototyping &amp; PEFT adapter training</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Apple MLX</strong></td>
+                            <td>Apple Silicon</td>
+                            <td>Ultra-Low (Zero-copy)</td>
+                            <td>High</td>
+                            <td>MLX-4bit, MLX-8bit</td>
+                            <td>Local Mac Development &amp; Serving</td>
+                        </tr>
+                        <tr>
+                            <td><strong>LiteRT / LiteRT-LM</strong></td>
+                            <td>Mobile, Web, Edge</td>
+                            <td>Ultra-Low</td>
+                            <td>High (on local hardware)</td>
+                            <td>FP8, INT4, INT8</td>
+                            <td>On-device Android/iOS and edge browsers</td>
+                        </tr>
+                        <tr>
+                            <td><strong>llama.cpp</strong></td>
+                            <td>CPU, macOS, Edge</td>
+                            <td>Low</td>
+                            <td>Medium-High</td>
+                            <td>GGUF (Q4_K_M, Q5_K_M)</td>
+                            <td>Local consumer desktop deployments</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- CHAPTER 1 QUIZ -->
+                <div class="quiz-container">
+                    <div class="quiz-question">Knowledge Check: Why does vLLM's PagedAttention dramatically outperform traditional Hugging Face Transformers serving on concurrent serving?</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Exactly! PagedAttention breaks the Key-Value cache of each sequence into fixed-size physical memory pages, eliminating internal fragmentation and letting you scale batch sizes without VRAM blowout.')">
+                            A) It divides KV cache tensors into fixed-size virtual pages, completely eliminating VRAM fragmentation.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Model weights are static. The dynamic memory blowout during concurrent serving is driven by the dynamic KV cache of active user threads.')">
+                            B) It compresses the static model weights into lower precision arrays dynamically during forward runs.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. While continuous batching helps with iteration-level scheduling, PagedAttention specifically solves the raw physical memory management.')">
+                            C) It bypasses GPU hardware boundaries entirely to run on system RAM.
+                        </div>
+                    </div>
+                    <div class="quiz-feedback"></div>
+                </div>
+            </article>
+
+
             <!-- CHAPTER 4: ROBUST EVALUATION -->
             <article id="chapter4">
-                <span class="book-badge">Chapter 4</span>
+                <span class="book-badge">Chapter 5</span>
                 <h2>Robust LLM Evaluation Strategies</h2>
                 <p>Deploying specialized classification or extraction models requires moving past blind trust in token completion. Relying strictly on academic benchmarks fails to capture real-world user distributions.</p>
 
@@ -2955,10 +3098,267 @@ print(f"Token-Level F1 (Conversational leakage): {compute_token_f1('Negative<end
             </article>
 
 
+            <article id="chapter8">
+                <span class="book-badge">Chapter 6</span>
+                <h2>Advanced Deep Learning Optimization</h2>
+                <p>To deploy models like Gemma at global scale, deep learning engineers must go beyond traditional fine-tuning and basic post-training quantization. This chapter explores cutting-edge optimization methodologies: Speculative Decoding, Knowledge Distillation with temperature-scaling mathematical corrections, Quantization-Aware Training (QAT), Structured &amp; Unstructured Pruning, and multi-node Kubernetes GKE pipelines for distributed serving.</p>
+
+                <!-- SECTION 1: SPECULATIVE DECODING -->
+                <h3>1. Speculative Decoding &amp; Acceptance Sampling</h3>
+                <p>Autoregressive generation is inherently memory-bandwidth bound: each token generation requires loading the entire model's parameters (billions of bytes) into local GPU registers to perform a single forward pass. <strong>Speculative Decoding</strong> bypasses this bottleneck by utilizing a smaller, faster "draft" model (e.g., Gemma 2B) to speculate a sequence of $K$ candidate tokens, which are then validated in parallel by the larger "target" model (e.g., Gemma 9B) in a single forward pass.</p>
+
+                <h4>Mathematical Derivation of Acceptance Probability</h4>
+                <p>To guarantee that the final generated token distribution is mathematically identical to the target model's true distribution, Speculative Decoding uses a modified rejection sampling scheme. Let $p(x)$ be the target model's probability distribution for token $x$, and $q(x)$ be the draft model's probability distribution.</p>
+                <p>For each hypothesized draft token $x_i$ ($i = 1, \dots, K$), we accept it with probability:</p>
+                $$\alpha = \min\left(1, \frac{p(x_i)}{q(x_i)}\right)$$
+                <p>If a token $x_i$ is accepted, we proceed to evaluate the next token $x_{i+1}$. If a token $x_i$ is rejected, we discard all subsequent speculated tokens ($x_{i+1}, \dots, x_K$), and sample the replacement token $x_i^*$ from the adjusted residual distribution:</p>
+                $$p'(x) = \frac{\max\left(0, p(x) - q(x)\right)}{\sum_{y} \max\left(0, p(y) - q(y)\right)}$$
+                <p>This formulation ensures unbiased sampling while maximizing the expected number of accepted tokens per draft verification pass.</p>
+
+                <div class="code-header"><span>HuggingFace Speculative Decoding Implementation</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Load the target model (large and accurate)
+target_model_id = "google/gemma-2-9b-it"
+target_model = AutoModelForCausalLM.from_pretrained(
+    target_model_id,
+    torch_dtype=torch.bfloat16,
+    device_map="auto"
+)
+
+# Load the draft model (small and fast)
+draft_model_id = "google/gemma-2-2b-it"
+draft_model = AutoModelForCausalLM.from_pretrained(
+    draft_model_id,
+    torch_dtype=torch.bfloat16,
+    device_map="auto"
+)
+
+tokenizer = AutoTokenizer.from_pretrained(target_model_id)
+
+inputs = tokenizer("Advanced optimization techniques in deep learning include", return_tensors="pt").to("cuda")
+
+# Generate speculatively by setting assistant_model
+outputs = target_model.generate(
+    **inputs,
+    assistant_model=draft_model,
+    max_new_tokens=100,
+    temperature=0.7,
+    do_sample=True
+)
+
+print(tokenizer.decode(outputs[0], skip_special_tokens=True))</code></pre>
+
+                <!-- SECTION 2: KNOWLEDGE DISTILLATION -->
+                <h3>2. Dual-Loss Knowledge Distillation</h3>
+                <p>Knowledge Distillation transfers the rich linguistic "dark knowledge" of a massive "teacher" model into a lightweight "student" model. Rather than training the student purely on hard ground-truth labels, it is optimized using a dual loss function containing both the traditional Cross-Entropy loss on hard labels and a soft-label Kullback-Leibler (KL) divergence loss evaluated on temperature-scaled teacher logits.</p>
+
+                <h4>Dual-Loss Mathematical Formulation</h4>
+                <p>Let $z_S$ and $z_T$ represent the logit outputs of the student and teacher models respectively. The soft probability distributions $p_S^T$ and $p_T^T$ are computed using a scaling temperature $T$:</p>
+                $$p_S^T(x) = \frac{\exp(z_{S,x} / T)}{\sum_y \exp(z_{S,y} / T)} \quad , \quad p_T^T(x) = \frac{\exp(z_{T,x} / T)}{\sum_y \exp(z_{T,y} / T)}$$
+                <p>The total loss function is defined as:</p>
+                $$\mathcal{L}_{\text{total}} = (1 - \alpha) \mathcal{L}_{\text{CE}}(y, \text{softmax}(z_S)) + \alpha T^2 \mathcal{L}_{\text{KD}}(p_T^T, p_S^T)$$
+                <p>Where $\mathcal{L}_{\text{CE}}$ is the standard cross-entropy loss, $\mathcal{L}_{\text{KD}}$ is the KL divergence $\text{KL}(p_T^T || p_S^T)$, and $\alpha$ is a balancing hyperparameter.</p>
+
+                <div class="note-box" style="background-color: var(--primary-light); border-left: 4px solid var(--primary); padding: 1.25rem; border-radius: 8px; margin: 1.5rem 0;">
+                    <strong>The \(T^2\) Temperature-Correction Factor:</strong> When dividing logits by $T$, the corresponding gradients computed with respect to the soft loss term scale down by a factor of $1/T^2$. To prevent the soft loss gradient from being completely dominated by the hard loss gradient as $T$ increases, we multiply the soft-label loss term by $T^2$. This mathematical correction ensures stable optimization and consistent gradient magnitude balance across different temperatures.
+                </div>
+
+                <div class="code-header"><span>Custom DistillationTrainer Implementation</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import torch
+import torch.nn as nn
+from transformers import Trainer
+
+class DistillationTrainer(Trainer):
+    def __init__(self, teacher_model, alpha=0.5, temperature=2.0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.teacher_model = teacher_model
+        self.teacher_model.eval() # Ensure teacher is in evaluation mode
+        self.alpha = alpha
+        self.temperature = temperature
+        self.kl_loss_fn = nn.KLDivLoss(reduction="batchmean")
+
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        # Student forward pass
+        student_outputs = model(**inputs)
+        student_logits = student_outputs.get("logits")
+        student_loss = student_outputs.get("loss") # Hard cross-entropy loss
+
+        # Teacher forward pass (no gradients computed)
+        with torch.no_grad():
+            teacher_outputs = self.teacher_model(**inputs)
+            teacher_logits = teacher_outputs.get("logits")
+
+        # Soft temperature-scaled log-probabilities
+        soft_student = nn.functional.log_softmax(student_logits / self.temperature, dim=-1)
+        soft_teacher = nn.functional.softmax(teacher_logits / self.temperature, dim=-1)
+
+        # KL Divergence scaled by T^2 as mathematically derived
+        kd_loss = self.kl_loss_fn(soft_student, soft_teacher) * (self.temperature ** 2)
+
+        # Combined dual-loss
+        loss = (1.0 - self.alpha) * student_loss + self.alpha * kd_loss
+
+        return (loss, student_outputs) if return_outputs else loss</code></pre>
+
+                <!-- SECTION 3: QUANTIZATION-AWARE TRAINING -->
+                <h3>3. Quantization-Aware Training (QAT) vs. Post-Training Quantization (PTQ)</h3>
+                <p>Post-Training Quantization (PTQ) compiles scale factors directly from pre-trained static weights, which inevitably introduces quantization noise and error. In contrast, <strong>Quantization-Aware Training (QAT)</strong> models the quantization process in the forward pass of training, allowing the model's parameters to adapt and minimize quantization loss during backpropagation.</p>
+
+                <h4>Straight-Through Estimator (STE) Math</h4>
+                <p>Quantization functions (such as rounding or clipping) are step-wise flat functions with zero derivative almost everywhere. During backpropagation, this zero gradient would halt gradient descent (since $\frac{\partial q}{\partial w} = 0$). To bypass this, the <strong>Straight-Through Estimator (STE)</strong> replaces the true derivative of the quantization function with an identity mapping during the backward pass:</p>
+                $$\text{Forward: } q = \text{round}\left( \text{clip}\left(\frac{w}{S}, q_{\min}, q_{\max}\right) \right)$$
+                $$\text{Backward: } \frac{\partial \mathcal{L}}{\partial w} \approx \frac{\partial \mathcal{L}}{\partial q}$$
+                <p>This allows gradients to flow directly to the continuous-valued weights, which are updated using high-precision FP32 accumulators, while the weights are quantized on the fly in the forward pass.</p>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Metric / Feature</th>
+                                <th>Post-Training Quantization (PTQ)</th>
+                                <th>Quantization-Aware Training (QAT)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Accuracy Retention</strong></td>
+                                <td>Minor to severe drop (especially for smaller models &lt; 7B parameters)</td>
+                                <td>Near-perfect preservation (often matching the original baseline model)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Computational Cost</strong></td>
+                                <td>Extremely low (minutes on a single GPU or CPU)</td>
+                                <td>High (requires full training runs, massive dataset batches, and long runtimes)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Code Complexity</strong></td>
+                                <td>Very simple (one-click scripts in <code>llama.cpp</code> or <code>bitsandbytes</code>)</td>
+                                <td>High (requires modifying trainers, using custom PyTorch or TensorRT-LLM APIs)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Ideal Target Use Cases</strong></td>
+                                <td>Deploying massive pre-trained LLMs on local workstation hardware quickly</td>
+                                <td>Enterprise serving of task-specific, fine-tuned models at hyper-scale</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- SECTION 4: STRUCTURED & UNSTRUCTURED PRUNING -->
+                <h3>4. Structured vs. Unstructured Model Pruning</h3>
+                <p>Pruning removes redundant weights from a neural network to decrease size and accelerate operations. However, the geometric structure of what we prune has major implications for actual hardware inference speeds.</p>
+
+                <h4>Unstructured Pruning (Element-wise)</h4>
+                <p>Unstructured pruning removes individual weight elements based on their absolute magnitude relative to a global or layer-wise threshold $\tau$:</p>
+                $$M_{i,j} = \begin{cases} 1 &amp; \text{if } |w_{i,j}| &gt; \tau \\ 0 &amp; \text{otherwise} \end{cases}$$
+                <p>While unstructured pruning can remove up to 90% of model weights without significant accuracy loss, it introduces "holes" into the weight matrices. Standard GPUs are highly inefficient at computing sparse matrix multiplications unless they can utilize highly specialized libraries or architectures (like NVIDIA's 2:4 structured sparsity), making actual speedups difficult to achieve on standard hardware.</p>
+
+                <h4>Structured Pruning (Channel/Row-wise)</h4>
+                <p>Structured pruning removes entire rows, columns, or structural channels based on their combined row-wise $L_2$ norm magnitude:</p>
+                $$M_{i,*} = \begin{cases} 1 &amp; \text{if } \|w_{i,*}\|_2 &gt; \tau \\ 0 &amp; \text{otherwise} \end{cases}$$
+                <p>Where the row-wise $L_2$ norm is defined as:</p>
+                $$\|w_{i,*}\|_2 = \sqrt{\sum_{j} w_{i,j}^2}$$
+                <p>By removing entire rows or attention heads, structured pruning produces smaller, <strong>dense</strong> matrices. These dense matrices map perfectly to standard GPU Tensor Cores, yielding immediate, direct speedups on any hardware without needing sparse execution libraries.</p>
+
+                <!-- SECTION 5: MULTI-NODE DISTRIBUTED PIPELINES -->
+                <h3>5. Distributed GKE Serving: Tensor Parallelism vs. Pipeline Parallelism</h3>
+                <p>When models cannot fit into the memory of a single GPU, we must partition the workload across multiple GPUs or nodes. Under Kubernetes (GKE), this is orchestrated using frameworks like Ray and vLLM configured with appropriate parallelization dimensions:</p>
+                <ul>
+                    <li><strong>Tensor Parallelism (TP):</strong> Splitting individual weight matrices (like self-attention projections) across multiple GPUs. This requires intra-node high-bandwidth NVLink connections due to the heavy <code>All-Reduce</code> communications required per layer.</li>
+                    <li><strong>Pipeline Parallelism (PP):</strong> Partitioning the model's sequential layers across different GPUs or virtual machine nodes. This operates with lower communication bandwidth constraints but requires scheduling strategies (like GPipe or 1F1B) to prevent execution bubbles.</li>
+                </ul>
+
+                <div class="code-header"><span>Kubernetes GKE vLLM Deployment Manifest (Ray / TP=8, PP=2)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-gemma-multi-node
+  namespace: default
+  labels:
+    app: vllm-gemma
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vllm-gemma
+  template:
+    metadata:
+      labels:
+        app: vllm-gemma
+    spec:
+      containers:
+      - name: vllm-server
+        image: vllm/vllm-openai:latest
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            nvidia.com/gpu: "8"
+            cpu: "64"
+            memory: "250Gi"
+          requests:
+            nvidia.com/gpu: "8"
+            cpu: "32"
+            memory: "128Gi"
+        env:
+        - name: MODEL_ID
+          value: "google/gemma-2-9b-it"
+        - name: HUGGING_FACE_HUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-secret
+              key: token
+        ports:
+        - containerPort: 8000
+        command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+        args:
+        - "--model=$(MODEL_ID)"
+        - "--tensor-parallel-size=8"
+        - "--pipeline-parallel-size=2"
+        - "--gpu-memory-utilization=0.95"
+        - "--max-model-len=8192"
+        - "--port=8000"</code></pre>
+
+                <!-- CHAPTER 8 QUIZ -->
+                <div class="quiz-container">
+                    <div class="quiz-question">Knowledge Check 1: In Knowledge Distillation, why is multiplying the soft-label loss term by \(T^2\) mathematically essential?</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. High-precision calculations are not influenced by the temperature scaling multiplier.')">
+                            A) To scale up logit weights so they don't trigger floating-point underflow on low-precision FP16 hardware.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Exactly! Dividing logits by T scales down gradients by 1/(T^2). Multiplying the soft loss by T^2 offsets this effect, ensuring gradients remain balanced across different temperatures.')">
+                            B) To cancel out the 1/(T^2) scaling of soft-loss gradients caused by dividing logits by temperature T during the forward pass.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'Incorrect. The number of active classes does not determine the temperature scaling factor.')">
+                            C) To adjust student logits so they dynamically scale depending on the total class-counts in the dataset vocabulary.
+                        </div>
+                    </div>
+                    <div class="quiz-feedback" style="display: none;"></div>
+                </div>
+
+                <div class="quiz-container" style="margin-top: 2rem;">
+                    <div class="quiz-question">Knowledge Check 2: Why does Structured Pruning provide immediate hardware speedups on normal GPUs while Unstructured Pruning often fails to do so?</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Both pruning methods reduce the raw number of parameter values.')">
+                            A) Structured pruning reduces model weights while unstructured pruning only changes activation patterns.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Correct! Structured pruning removes entire contiguous blocks, keeping matrices dense and perfectly aligned with GPU Tensor Cores. Unstructured pruning leaves a sparse pattern of zeros that standard GPUs cannot compute efficiently.')">
+                            B) Structured pruning removes entire layers/rows/attention-heads to keep matrices dense. Unstructured pruning leaves sparse matrix holes that require specialized hardware or libraries.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Straight-Through Estimators (STE) are used in Quantization-Aware Training (QAT), not pruning.')">
+                            C) Structured pruning relies on the Straight-Through Estimator during backpropagation while unstructured pruning operates completely post-training.
+                        </div>
+                    </div>
+                    <div class="quiz-feedback" style="display: none;"></div>
+                </div>
+            </article>
+
+
             <!-- CHAPTER 5: FIRST-HAND LESSONS -->
             <article id="chapter5">
-                <span class="book-badge">Chapter 5</span>
-                <h2>First-Hand Engineering Lessons from our Gemma 4 Pipeline</h2>
+                <span class="book-badge">Chapter 7</span>
+                <h2>Empirical Pipeline Lessons &amp; Failure Modes</h2>
                 <p>During our fine-tuning and deployment session for Google's <strong>Gemma 4 (Edge 4B)</strong> model, we encountered several real-world engineering hurdles, runtime errors, and system limitations. This document chronicles those errors, the root causes we identified, and the specific architectural and code-level fixes we engineered to achieve production readiness.</p>
 
                 <h3>1. The Colab Form / SFTConfig Run Name Crash</h3>
@@ -3020,135 +3420,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
             </article>
 
 
-            <!-- CHAPTER 6: AGENTIC DATASET PREPARATION -->
-            <article id="chapter6">
-                <span class="book-badge">Chapter 6</span>
-                <h2>Agentic Dataset Synthesis &amp; Multimodal Architectures</h2>
-                
-                <h3>Multimodal Vision-Language Architecture (Gemma Vision)</h3>
-                <p>Gemma Vision models (such as Gemma 2 2B-V and Gemma 2 9B-V) extend Google’s causal language model architecture with advanced visual comprehension capabilities. Instead of treating input purely as text-only causal tokens, these models ingest interleaved text and visual inputs dynamically, aligning them in a shared semantic latent space.</p>
-                
-                <h4>1. Vision Encoder: SigLIP</h4>
-                <p>The visual frontend of the model is powered by **SigLIP (Sigmoid Language-Image Pre-training)**, typically using a Vision Transformer (ViT) variant such as <code>siglip-so400m-patch14-384</code>.</p>
-                <ul>
-                    <li><strong>Sigmoid Loss:</strong> Unlike standard CLIP which uses a softmax loss across an entire batch (coupling all examples together and requiring massive batch sizes for stabilization), SigLIP employs a pairwise sigmoid loss. This treats the image-text matching task as a collection of independent binary classification tasks, stabilizing training and scaling efficiently to arbitrary batch sizes.</li>
-                    <li><strong>Visual Tokenization:</strong> A raw image of size \(H \times W\) is split into a grid of non-overlapping patches of size \(P \times P\) (where \(P = 14\) is the patch size). For a standard input resolution of \(384 \times 384\) pixels:
-                        $$N_{\text{patches}} = \left( \frac{H}{P} \right) \times \left( \frac{W}{P} \right) = \left( \frac{384}{14} \right) \times \left( \frac{384}{14} \right) \approx 27.4 \times 27.4 \implies 729 \text{ tokens}$$
-                        These 729 visual tokens are processed by the ViT to output 729 patch embeddings, each of dimension \(d_{\text{vision}} = 1152\) (for the SO400m backbones).
-                    </li>
-                </ul>
-
-                <h4>2. Visual Patch Projection Layers</h4>
-                <p>The visual patch embeddings cannot be fed directly into the language model because their dimensionality (\(d_{\text{vision}}\)) does not match the LLM's hidden layer dimension (\(d_{\text{LLM}}\), which is \(2048\) for Gemma 2 2B or \(3584\) for Gemma 2 9B). To align the visual tokens with the textual embedding space, a <strong>Multimodal Projector</strong> is used. In Gemma 2 Vision, this is implemented as a 2-layer Multi-Layer Perceptron (MLP) with SwiGLU or GELU activation:</p>
-                <div class="math-block">
-                    $$X_{\text{projected}} = W_2 \cdot \text{Act}(W_1 \cdot H_{\text{vision}} + b_1) + b_2$$
-                    Where:
-                    <ul>
-                        <li>\(H_{\text{vision}} \in \mathbb{R}^{729 \times d_{\text{vision}}}\) is the matrix of raw vision patch embeddings.</li>
-                        <li>\(W_1 \in \mathbb{R}^{d_{\text{vision}} \times d_{\text{proj}}}\) and \(W_2 \in \mathbb{R}^{d_{\text{proj}} \times d_{\text{LLM}}}\) are learnable projection matrices (often \(d_{\text{proj}} = 4 \times d_{\text{LLM}}\)).</li>
-                        <li>\(\text{Act}\) is the activation function (e.g., GELU).</li>
-                        <li>\(X_{\text{projected}} \in \mathbb{R}^{729 \times d_{\text{LLM}}}\) is the final sequence of visual patch embeddings aligned with the text latent space.</li>
-                    </ul>
-                </div>
-
-                <h4>3. Interleaved Text and Image Representation</h4>
-                <p>Visual tokens are interleaved with text tokens dynamically in the input sequence. Special boundary tokens are wrapped around visual sequences to let the causal decoder recognize sensory boundaries:</p>
-                <div class="math-block">
-                    $$\text{Input Sequence} = \left[ \langle\text{bos}\rangle, \dots, \text{text tokens}, \langle\text{image}\rangle, v_1, v_2, \dots, v_{729}, \langle\text{/image}\rangle, \text{text tokens} \right]$$
-                </div>
-                <p>In adaptive-resolution variants (such as processing high-resolution images), the model splits a large image (e.g., \(896 \times 896\)) into multiple \(384 \times 384\) tiles plus a downscaled global thumbnail. Each tile is processed independently by SigLIP, projected, and interleaved with custom row/column delimiter tokens:</p>
-                <div class="math-block">
-                    $$N_{\text{total\_visual\_tokens}} = (N_{\text{tiles}} + 1) \times 729 + N_{\text{delimiters}}$$
-                </div>
-                <p>For a 4-tile high-resolution image, this results in over \(3,645\) visual tokens, requiring substantial KV cache capacity and VRAM allocations during serving.</p>
-
-                <h3>Agentic Dataset Synthesis with Google Antigravity (AGY)</h3>
-                <p>For high-fidelity training data that captures nuanced human communication styles, static templates fall short. Google Antigravity (AGY) offers a powerful alternative: using autonomous agents acting as a <strong>Producer Archetype</strong> to generate highly varied, schema-compliant, and diverse datasets.</p>
-
-                <div class="note-box" style="background-color: var(--primary-light); border-left: 4px solid var(--primary); padding: 1rem; border-radius: 4px; margin-bottom: 2rem;">
-                    <strong>Setup and Execution:</strong>
-                    <ul style="margin-top: 0.5rem; margin-bottom: 0;">
-                        <li><strong>Antigravity CLI:</strong> Run <code>agy</code> in your terminal.</li>
-                        <li><strong>Antigravity 2.0 (UI):</strong> Launch the Desktop Client and open your project folder to grant workspace access.</li>
-                    </ul>
-                </div>
-
-                <h3>Four Enterprise Dataset Synthesis Prompts</h3>
-                <p>These four prompts can be copied and pasted directly into AGY to generate high-value, production-grade custom datasets:</p>
-
-                <div style="display: flex; flex-direction: column; gap: 2.5rem; margin-top: 2rem;">
-                    <!-- Use Case 1 -->
-                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
-                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">1. Sarcastic Sentiment &amp; Emotion Classifier</h4>
-                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train a classifier to identify subtle sarcasm, double-negations, and frustrated tones.</p>
-                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
-Task: Create a synthetic fine-tuning dataset of 1000 highly varied sentiment and emotional classification samples.
-Constraints:
-- Out of these, 400 must contain subtle sarcasm, 200 mixed-sentiments, 200 double-negations, and 200 realistic typos/slang.
-- Target sentiment classes: "Positive", "Negative", "Sarcastic", "Frustrated".
-- Format: Save the output directly as a JSON Lines (.jsonl) file in my current workspace named `sentiment_dataset.jsonl`.
-- Schema: Every line must be a single JSON object matching this structure exactly:
-  {"messages": [{"role": "user", "content": "Classify the sentiment: '&lt;REVIEW_TEXT&gt;'"}, {"role": "model", "content": "&lt;LABEL&gt;"}]}
-
-Begin generating now, ensuring diverse vocabulary across sectors (food, apps, hotels, tech gadgets). Avoid repeating review structures.</code></pre>
-                    </div>
-
-                    <!-- Use Case 2 -->
-                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
-                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">2. Multilingual Support Ticket Router</h4>
-                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train a gatekeeper model to route customer support tickets in multiple languages to structured JSON payloads.</p>
-                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
-Task: Create a synthetic fine-tuning dataset of 1000 customer support triage samples.
-Constraints:
-- The input review should be in random languages (English, Spanish, French, German, Japanese, Hindi).
-- The model must output a JSON block indicating category and priority.
-- Target Categories: "billing", "technical_support", "account_security", "refund_request".
-- Target Priorities: "critical", "high", "medium", "low".
-- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `triage_dataset.jsonl`.
-- Schema: Every line must be a single JSON object matching this structure exactly:
-  {"messages": [{"role": "user", "content": "Triage this support ticket: '&lt;TICKET_TEXT&gt;'"}, {"role": "model", "content": "{\\\"category\\\": \\\"&lt;CAT&gt;\\\", \\\"priority\\\": \\\"&lt;PRIORITY&gt;\\\"}"}]}
-
-Begin generating now, ensuring highly realistic support scenarios (e.g. payment failure, locked out of account, api latency, pricing query).</code></pre>
-                    </div>
-
-                    <!-- Use Case 3 -->
-                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
-                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">3. Text-to-API Payload Copilot</h4>
-                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train a text-to-API translation engine to output schema-compliant REST API JSON function calls.</p>
-                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
-Task: Create a synthetic fine-tuning dataset of 1000 Text-to-API function call translation samples.
-Constraints:
-- The user prompt should be a natural language request to perform an action (e.g., book a flight, update a user profile, send a notification).
-- The model response should be a formatted, structured REST API payload.
-- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `api_dataset.jsonl`.
-- Schema: Every line must be a single JSON object matching this structure exactly:
-  {"messages": [{"role": "user", "content": "Translate to API payload: '&lt;REQUEST_TEXT&gt;'"}, {"role": "model", "content": "{\\\"action\\\": \\\"&lt;ACTION&gt;\\\", \\\"params\\\": {&lt;PARAMETERS&gt;}}"}]}
-
-Ensure wide variety of operations (Create, Read, Update, Delete) across CRM, booking, and notification system paradigms.</code></pre>
-                    </div>
-
-                    <!-- Use Case 4 -->
-                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
-                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">4. Enterprise PII Redactor</h4>
-                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train Gemma to redact sensitive information (SSN, credit card, emails) from conversational chat histories.</p>
-                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
-Task: Create a synthetic fine-tuning dataset of 1000 PII anonymization samples.
-Constraints:
-- The input should be a conversational transcript containing names, credit card numbers, email addresses, phone numbers, or SSNs.
-- The model response must be the exact same transcript, but with all PII replaced by standardized tags like `[REDACTED_NAME]`, `[REDACTED_EMAIL]`, `[REDACTED_PHONE]`, `[REDACTED_CARD]`.
-- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `pii_dataset.jsonl`.
-- Schema: Every line must be a single JSON object matching this structure exactly:
-  {"messages": [{"role": "user", "content": "Redact PII from this transcript: '&lt;TRANSCRIPT&gt;'"}, {"role": "model", "content": "&lt;REDACTED_TRANSCRIPT&gt;"}]}
-
-Ensure diverse realistic chat snippets with conversational natural flow, typos, and varied customer service contexts.</code></pre>
-                    </div>
-                </div>
-            </article>
-
-
             <!-- CHAPTER 7: PROJECT RUN GUIDE & INTERACTIVE DEPLOYMENT BUILDER -->
             <article id="chapter7">
-                <span class="book-badge">Chapter 7</span>
+                <span class="book-badge">Chapter 8</span>
                 <h2>Repository Operations &amp; Run Guide</h2>
                 <p>This repository provides a production-grade, serverless framework. To help developers deploy seamlessly, we compiled all of our granular Python scripts and infrastructure tools into <strong>six atomic orchestration shell scripts</strong> that support both interactive workflows and fully automated, headless CI/CD systems.</p>
 
@@ -3509,263 +3783,6 @@ python src/evaluation_check.py</code></pre>
                     <p style="font-size: 0.9rem; line-height: 1.5; color: var(--text-secondary); margin-bottom: 0.5rem;">To customize the companion notebook's text or programmatic cells, edit <code>notebooks/create_colab_notebook.py</code> and execute:</p>
                     <div class="code-header"><span>Shell</span></div>
                     <pre style="margin-top: 0 !important; margin-bottom: 0 !important;"><code class="language-bash">python3 notebooks/create_colab_notebook.py</code></pre>
-                </div>
-            </article>
-
-
-            <article id="chapter8">
-                <span class="book-badge">Chapter 8</span>
-                <h2>Advanced Deep Learning Optimization</h2>
-                <p>To deploy models like Gemma at global scale, deep learning engineers must go beyond traditional fine-tuning and basic post-training quantization. This chapter explores cutting-edge optimization methodologies: Speculative Decoding, Knowledge Distillation with temperature-scaling mathematical corrections, Quantization-Aware Training (QAT), Structured &amp; Unstructured Pruning, and multi-node Kubernetes GKE pipelines for distributed serving.</p>
-
-                <!-- SECTION 1: SPECULATIVE DECODING -->
-                <h3>1. Speculative Decoding &amp; Acceptance Sampling</h3>
-                <p>Autoregressive generation is inherently memory-bandwidth bound: each token generation requires loading the entire model's parameters (billions of bytes) into local GPU registers to perform a single forward pass. <strong>Speculative Decoding</strong> bypasses this bottleneck by utilizing a smaller, faster "draft" model (e.g., Gemma 2B) to speculate a sequence of $K$ candidate tokens, which are then validated in parallel by the larger "target" model (e.g., Gemma 9B) in a single forward pass.</p>
-
-                <h4>Mathematical Derivation of Acceptance Probability</h4>
-                <p>To guarantee that the final generated token distribution is mathematically identical to the target model's true distribution, Speculative Decoding uses a modified rejection sampling scheme. Let $p(x)$ be the target model's probability distribution for token $x$, and $q(x)$ be the draft model's probability distribution.</p>
-                <p>For each hypothesized draft token $x_i$ ($i = 1, \dots, K$), we accept it with probability:</p>
-                $$\alpha = \min\left(1, \frac{p(x_i)}{q(x_i)}\right)$$
-                <p>If a token $x_i$ is accepted, we proceed to evaluate the next token $x_{i+1}$. If a token $x_i$ is rejected, we discard all subsequent speculated tokens ($x_{i+1}, \dots, x_K$), and sample the replacement token $x_i^*$ from the adjusted residual distribution:</p>
-                $$p'(x) = \frac{\max\left(0, p(x) - q(x)\right)}{\sum_{y} \max\left(0, p(y) - q(y)\right)}$$
-                <p>This formulation ensures unbiased sampling while maximizing the expected number of accepted tokens per draft verification pass.</p>
-
-                <div class="code-header"><span>HuggingFace Speculative Decoding Implementation</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
-                <pre><code class="language-python">import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-# Load the target model (large and accurate)
-target_model_id = "google/gemma-2-9b-it"
-target_model = AutoModelForCausalLM.from_pretrained(
-    target_model_id,
-    torch_dtype=torch.bfloat16,
-    device_map="auto"
-)
-
-# Load the draft model (small and fast)
-draft_model_id = "google/gemma-2-2b-it"
-draft_model = AutoModelForCausalLM.from_pretrained(
-    draft_model_id,
-    torch_dtype=torch.bfloat16,
-    device_map="auto"
-)
-
-tokenizer = AutoTokenizer.from_pretrained(target_model_id)
-
-inputs = tokenizer("Advanced optimization techniques in deep learning include", return_tensors="pt").to("cuda")
-
-# Generate speculatively by setting assistant_model
-outputs = target_model.generate(
-    **inputs,
-    assistant_model=draft_model,
-    max_new_tokens=100,
-    temperature=0.7,
-    do_sample=True
-)
-
-print(tokenizer.decode(outputs[0], skip_special_tokens=True))</code></pre>
-
-                <!-- SECTION 2: KNOWLEDGE DISTILLATION -->
-                <h3>2. Dual-Loss Knowledge Distillation</h3>
-                <p>Knowledge Distillation transfers the rich linguistic "dark knowledge" of a massive "teacher" model into a lightweight "student" model. Rather than training the student purely on hard ground-truth labels, it is optimized using a dual loss function containing both the traditional Cross-Entropy loss on hard labels and a soft-label Kullback-Leibler (KL) divergence loss evaluated on temperature-scaled teacher logits.</p>
-
-                <h4>Dual-Loss Mathematical Formulation</h4>
-                <p>Let $z_S$ and $z_T$ represent the logit outputs of the student and teacher models respectively. The soft probability distributions $p_S^T$ and $p_T^T$ are computed using a scaling temperature $T$:</p>
-                $$p_S^T(x) = \frac{\exp(z_{S,x} / T)}{\sum_y \exp(z_{S,y} / T)} \quad , \quad p_T^T(x) = \frac{\exp(z_{T,x} / T)}{\sum_y \exp(z_{T,y} / T)}$$
-                <p>The total loss function is defined as:</p>
-                $$\mathcal{L}_{\text{total}} = (1 - \alpha) \mathcal{L}_{\text{CE}}(y, \text{softmax}(z_S)) + \alpha T^2 \mathcal{L}_{\text{KD}}(p_T^T, p_S^T)$$
-                <p>Where $\mathcal{L}_{\text{CE}}$ is the standard cross-entropy loss, $\mathcal{L}_{\text{KD}}$ is the KL divergence $\text{KL}(p_T^T || p_S^T)$, and $\alpha$ is a balancing hyperparameter.</p>
-
-                <div class="note-box" style="background-color: var(--primary-light); border-left: 4px solid var(--primary); padding: 1.25rem; border-radius: 8px; margin: 1.5rem 0;">
-                    <strong>The \(T^2\) Temperature-Correction Factor:</strong> When dividing logits by $T$, the corresponding gradients computed with respect to the soft loss term scale down by a factor of $1/T^2$. To prevent the soft loss gradient from being completely dominated by the hard loss gradient as $T$ increases, we multiply the soft-label loss term by $T^2$. This mathematical correction ensures stable optimization and consistent gradient magnitude balance across different temperatures.
-                </div>
-
-                <div class="code-header"><span>Custom DistillationTrainer Implementation</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
-                <pre><code class="language-python">import torch
-import torch.nn as nn
-from transformers import Trainer
-
-class DistillationTrainer(Trainer):
-    def __init__(self, teacher_model, alpha=0.5, temperature=2.0, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.teacher_model = teacher_model
-        self.teacher_model.eval() # Ensure teacher is in evaluation mode
-        self.alpha = alpha
-        self.temperature = temperature
-        self.kl_loss_fn = nn.KLDivLoss(reduction="batchmean")
-
-    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
-        # Student forward pass
-        student_outputs = model(**inputs)
-        student_logits = student_outputs.get("logits")
-        student_loss = student_outputs.get("loss") # Hard cross-entropy loss
-
-        # Teacher forward pass (no gradients computed)
-        with torch.no_grad():
-            teacher_outputs = self.teacher_model(**inputs)
-            teacher_logits = teacher_outputs.get("logits")
-
-        # Soft temperature-scaled log-probabilities
-        soft_student = nn.functional.log_softmax(student_logits / self.temperature, dim=-1)
-        soft_teacher = nn.functional.softmax(teacher_logits / self.temperature, dim=-1)
-
-        # KL Divergence scaled by T^2 as mathematically derived
-        kd_loss = self.kl_loss_fn(soft_student, soft_teacher) * (self.temperature ** 2)
-
-        # Combined dual-loss
-        loss = (1.0 - self.alpha) * student_loss + self.alpha * kd_loss
-
-        return (loss, student_outputs) if return_outputs else loss</code></pre>
-
-                <!-- SECTION 3: QUANTIZATION-AWARE TRAINING -->
-                <h3>3. Quantization-Aware Training (QAT) vs. Post-Training Quantization (PTQ)</h3>
-                <p>Post-Training Quantization (PTQ) compiles scale factors directly from pre-trained static weights, which inevitably introduces quantization noise and error. In contrast, <strong>Quantization-Aware Training (QAT)</strong> models the quantization process in the forward pass of training, allowing the model's parameters to adapt and minimize quantization loss during backpropagation.</p>
-
-                <h4>Straight-Through Estimator (STE) Math</h4>
-                <p>Quantization functions (such as rounding or clipping) are step-wise flat functions with zero derivative almost everywhere. During backpropagation, this zero gradient would halt gradient descent (since $\frac{\partial q}{\partial w} = 0$). To bypass this, the <strong>Straight-Through Estimator (STE)</strong> replaces the true derivative of the quantization function with an identity mapping during the backward pass:</p>
-                $$\text{Forward: } q = \text{round}\left( \text{clip}\left(\frac{w}{S}, q_{\min}, q_{\max}\right) \right)$$
-                $$\text{Backward: } \frac{\partial \mathcal{L}}{\partial w} \approx \frac{\partial \mathcal{L}}{\partial q}$$
-                <p>This allows gradients to flow directly to the continuous-valued weights, which are updated using high-precision FP32 accumulators, while the weights are quantized on the fly in the forward pass.</p>
-
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Metric / Feature</th>
-                                <th>Post-Training Quantization (PTQ)</th>
-                                <th>Quantization-Aware Training (QAT)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>Accuracy Retention</strong></td>
-                                <td>Minor to severe drop (especially for smaller models &lt; 7B parameters)</td>
-                                <td>Near-perfect preservation (often matching the original baseline model)</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Computational Cost</strong></td>
-                                <td>Extremely low (minutes on a single GPU or CPU)</td>
-                                <td>High (requires full training runs, massive dataset batches, and long runtimes)</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Code Complexity</strong></td>
-                                <td>Very simple (one-click scripts in <code>llama.cpp</code> or <code>bitsandbytes</code>)</td>
-                                <td>High (requires modifying trainers, using custom PyTorch or TensorRT-LLM APIs)</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Ideal Target Use Cases</strong></td>
-                                <td>Deploying massive pre-trained LLMs on local workstation hardware quickly</td>
-                                <td>Enterprise serving of task-specific, fine-tuned models at hyper-scale</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- SECTION 4: STRUCTURED & UNSTRUCTURED PRUNING -->
-                <h3>4. Structured vs. Unstructured Model Pruning</h3>
-                <p>Pruning removes redundant weights from a neural network to decrease size and accelerate operations. However, the geometric structure of what we prune has major implications for actual hardware inference speeds.</p>
-
-                <h4>Unstructured Pruning (Element-wise)</h4>
-                <p>Unstructured pruning removes individual weight elements based on their absolute magnitude relative to a global or layer-wise threshold $\tau$:</p>
-                $$M_{i,j} = \begin{cases} 1 &amp; \text{if } |w_{i,j}| &gt; \tau \\ 0 &amp; \text{otherwise} \end{cases}$$
-                <p>While unstructured pruning can remove up to 90% of model weights without significant accuracy loss, it introduces "holes" into the weight matrices. Standard GPUs are highly inefficient at computing sparse matrix multiplications unless they can utilize highly specialized libraries or architectures (like NVIDIA's 2:4 structured sparsity), making actual speedups difficult to achieve on standard hardware.</p>
-
-                <h4>Structured Pruning (Channel/Row-wise)</h4>
-                <p>Structured pruning removes entire rows, columns, or structural channels based on their combined row-wise $L_2$ norm magnitude:</p>
-                $$M_{i,*} = \begin{cases} 1 &amp; \text{if } \|w_{i,*}\|_2 &gt; \tau \\ 0 &amp; \text{otherwise} \end{cases}$$
-                <p>Where the row-wise $L_2$ norm is defined as:</p>
-                $$\|w_{i,*}\|_2 = \sqrt{\sum_{j} w_{i,j}^2}$$
-                <p>By removing entire rows or attention heads, structured pruning produces smaller, <strong>dense</strong> matrices. These dense matrices map perfectly to standard GPU Tensor Cores, yielding immediate, direct speedups on any hardware without needing sparse execution libraries.</p>
-
-                <!-- SECTION 5: MULTI-NODE DISTRIBUTED PIPELINES -->
-                <h3>5. Distributed GKE Serving: Tensor Parallelism vs. Pipeline Parallelism</h3>
-                <p>When models cannot fit into the memory of a single GPU, we must partition the workload across multiple GPUs or nodes. Under Kubernetes (GKE), this is orchestrated using frameworks like Ray and vLLM configured with appropriate parallelization dimensions:</p>
-                <ul>
-                    <li><strong>Tensor Parallelism (TP):</strong> Splitting individual weight matrices (like self-attention projections) across multiple GPUs. This requires intra-node high-bandwidth NVLink connections due to the heavy <code>All-Reduce</code> communications required per layer.</li>
-                    <li><strong>Pipeline Parallelism (PP):</strong> Partitioning the model's sequential layers across different GPUs or virtual machine nodes. This operates with lower communication bandwidth constraints but requires scheduling strategies (like GPipe or 1F1B) to prevent execution bubbles.</li>
-                </ul>
-
-                <div class="code-header"><span>Kubernetes GKE vLLM Deployment Manifest (Ray / TP=8, PP=2)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
-                <pre><code class="language-yaml">apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: vllm-gemma-multi-node
-  namespace: default
-  labels:
-    app: vllm-gemma
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: vllm-gemma
-  template:
-    metadata:
-      labels:
-        app: vllm-gemma
-    spec:
-      containers:
-      - name: vllm-server
-        image: vllm/vllm-openai:latest
-        imagePullPolicy: IfNotPresent
-        resources:
-          limits:
-            nvidia.com/gpu: "8"
-            cpu: "64"
-            memory: "250Gi"
-          requests:
-            nvidia.com/gpu: "8"
-            cpu: "32"
-            memory: "128Gi"
-        env:
-        - name: MODEL_ID
-          value: "google/gemma-2-9b-it"
-        - name: HUGGING_FACE_HUB_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: hf-secret
-              key: token
-        ports:
-        - containerPort: 8000
-        command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
-        args:
-        - "--model=$(MODEL_ID)"
-        - "--tensor-parallel-size=8"
-        - "--pipeline-parallel-size=2"
-        - "--gpu-memory-utilization=0.95"
-        - "--max-model-len=8192"
-        - "--port=8000"</code></pre>
-
-                <!-- CHAPTER 8 QUIZ -->
-                <div class="quiz-container">
-                    <div class="quiz-question">Knowledge Check 1: In Knowledge Distillation, why is multiplying the soft-label loss term by \(T^2\) mathematically essential?</div>
-                    <div class="quiz-options">
-                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. High-precision calculations are not influenced by the temperature scaling multiplier.')">
-                            A) To scale up logit weights so they don't trigger floating-point underflow on low-precision FP16 hardware.
-                        </div>
-                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Exactly! Dividing logits by T scales down gradients by 1/(T^2). Multiplying the soft loss by T^2 offsets this effect, ensuring gradients remain balanced across different temperatures.')">
-                            B) To cancel out the 1/(T^2) scaling of soft-loss gradients caused by dividing logits by temperature T during the forward pass.
-                        </div>
-                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'Incorrect. The number of active classes does not determine the temperature scaling factor.')">
-                            C) To adjust student logits so they dynamically scale depending on the total class-counts in the dataset vocabulary.
-                        </div>
-                    </div>
-                    <div class="quiz-feedback" style="display: none;"></div>
-                </div>
-
-                <div class="quiz-container" style="margin-top: 2rem;">
-                    <div class="quiz-question">Knowledge Check 2: Why does Structured Pruning provide immediate hardware speedups on normal GPUs while Unstructured Pruning often fails to do so?</div>
-                    <div class="quiz-options">
-                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Both pruning methods reduce the raw number of parameter values.')">
-                            A) Structured pruning reduces model weights while unstructured pruning only changes activation patterns.
-                        </div>
-                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Correct! Structured pruning removes entire contiguous blocks, keeping matrices dense and perfectly aligned with GPU Tensor Cores. Unstructured pruning leaves a sparse pattern of zeros that standard GPUs cannot compute efficiently.')">
-                            B) Structured pruning removes entire layers/rows/attention-heads to keep matrices dense. Unstructured pruning leaves sparse matrix holes that require specialized hardware or libraries.
-                        </div>
-                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Straight-Through Estimators (STE) are used in Quantization-Aware Training (QAT), not pruning.')">
-                            C) Structured pruning relies on the Straight-Through Estimator during backpropagation while unstructured pruning operates completely post-training.
-                        </div>
-                    </div>
-                    <div class="quiz-feedback" style="display: none;"></div>
                 </div>
             </article>
 
@@ -4624,7 +4641,7 @@ for pr in test_reviews:
         // Fuzzy search for table of contents / chapters
         function fuzzySearchTOC() {
             const query = document.getElementById('toc-search').value.toLowerCase();
-            const items = document.querySelectorAll('#nav-list li');
+            const items = document.querySelectorAll('.nav-menu li');
 
             items.forEach(item => {
                 const text = item.innerText.toLowerCase();
@@ -4645,7 +4662,7 @@ for pr in test_reviews:
 
             // Update top bar breadcrumbs
             const label = element.querySelector('span').innerText;
-            document.getElementById('top-breadcrumbs').innerText = `Gemma 4 Fine-tuning encyclopaedia > ${label}`;
+            document.getElementById('top-breadcrumbs').innerText = `Gemma 4 Fine-tuning Encyclopaedia > ${label}`;
 
             const targetId = element.getAttribute('href');
             

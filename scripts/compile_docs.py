@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gemma 4 Fine-Tuning & Serving Encyclopedia - Documentation Compiler
+Gemma 4 Fine-Tuning & Serving Encyclopaedia - Documentation Compiler
 This script compiles modular chapters from knowledgebase/src/chapters/ 
 and wraps them inside knowledgebase/src/shell_template.html 
 to build the highly optimized, offline-friendly single-page production index.html.
@@ -22,7 +22,7 @@ def main():
     output_index_path = os.path.join(kb_dir, "index.html")
     
     print("====================================================")
-    print("  Gemma 4 Encyclopedia Compiler - Building Production")
+    print("  Gemma 4 Encyclopaedia Compiler - Building Production")
     print("====================================================")
     
     # Check if files exist
@@ -34,17 +34,16 @@ def main():
     with open(shell_template_path, 'r', encoding='utf-8') as f:
         shell_content = f.read()
         
-    # Sequence of chapters to compile
     chapters_order = [
         "introduction",
-        "chapter1",
-        "chapter2",
-        "chapter3",
-        "chapter4",
-        "chapter5",
         "chapter6",
-        "chapter7",
+        "chapter3",
+        "chapter2",
+        "chapter1",
+        "chapter4",
         "chapter8",
+        "chapter5",
+        "chapter7",
         "chapter9"
     ]
     

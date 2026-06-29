@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemma 4 Fine-tuning encyclopaedia</title>
+    <title>Gemma 4 Fine-tuning Encyclopaedia</title>
     <!-- Inter & JetBrains Mono Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -445,6 +445,15 @@
             font-size: 0.875rem;
             color: var(--text-secondary);
             border-bottom: 1px solid var(--border);
+        }
+
+        th:first-child, td:first-child {
+            white-space: nowrap;
+        }
+
+        td:first-child code {
+            white-space: nowrap !important;
+            word-break: normal !important;
         }
 
         tr:last-child td {
@@ -891,16 +900,16 @@
         <aside>
             <div class="brand-container">
                 <div class="brand-icon">G</div>
-                <div class="brand-title">Gemma 4 Fine-tuning encyclopaedia</div>
+                <div class="brand-title">Gemma 4 Fine-tuning Encyclopaedia</div>
             </div>
 
             <div class="search-wrapper">
                 <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                <input type="text" class="search-input" id="toc-search" placeholder="Search encyclopedia..." onkeyup="fuzzySearchTOC()">
+                <input type="text" class="search-input" id="toc-search" placeholder="Search encyclopaedia..." onkeyup="fuzzySearchTOC()">
             </div>
 
-            <div class="nav-section-title">Manual Chapters</div>
-            <ul class="nav-menu" id="nav-list">
+            <div class="nav-section-title">Chapters</div>
+            <ul class="nav-menu" id="nav-list-kb">
                 <li>
                     <a href="#introduction" class="nav-item active" onclick="setActiveNav(event, this)">
                         <span>Cover &amp; Introduction</span>
@@ -908,50 +917,54 @@
                     </a>
                 </li>
                 <li>
-                    <a href="#chapter1" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>1. Inference Engines</span>
-                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
-                    </a>
-                </li>
-                <li>
-                    <a href="#chapter2" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>2. Quantisation Formats</span>
+                    <a href="#chapter6" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>1. Agentic Dataset Prep</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
                 <li>
                     <a href="#chapter3" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>3. Fine-Tuning &amp; PEFT</span>
+                        <span>2. Fine-Tuning &amp; PEFT</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter2" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>3. Quantisation Formats</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter1" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>4. Inference Engines</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
                 <li>
                     <a href="#chapter4" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>4. Robust Evaluation</span>
-                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
-                    </a>
-                </li>
-                <li>
-                    <a href="#chapter5" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>5. Our Pipeline Lessons</span>
-                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
-                    </a>
-                </li>
-                <li>
-                    <a href="#chapter6" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>6. Agentic Dataset Prep</span>
-                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
-                    </a>
-                </li>
-                <li>
-                    <a href="#chapter7" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>7. Project Run Guide</span>
+                        <span>5. Robust Evaluation</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
                 <li>
                     <a href="#chapter8" class="nav-item" onclick="setActiveNav(event, this)">
-                        <span>8. Advanced Optimization</span>
+                        <span>6. Advanced Optimization</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter5" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>7. Empirical Pipeline Lessons</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+            </ul>
+
+            <div class="nav-section-title" style="margin-top: 1.5rem;">Project Artifacts</div>
+            <ul class="nav-menu" id="nav-list-artifacts">
+                <li>
+                    <a href="#chapter7" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>8. Project Run Guide</span>
                         <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
                     </a>
                 </li>
@@ -970,20 +983,24 @@
             
             <!-- Top Bar with controls -->
             <div class="top-bar">
-                <div class="breadcrumbs" id="top-breadcrumbs">Gemma 4 Fine-tuning encyclopaedia &gt; Introduction</div>
+                <div class="breadcrumbs" id="top-breadcrumbs">Gemma 4 Fine-tuning Encyclopaedia &gt; Introduction</div>
                 <!-- Responsive Mobile Chapter Navigation Dropdown -->
                 <div class="mobile-nav-container">
                     <select id="mobile-chapter-select" onchange="window.location.hash = this.value; const link = document.querySelector('.nav-item[href=\'' + this.value + '\']'); if (link) { setActiveNav(null, link); }">
                         <option value="#introduction" selected>Cover &amp; Introduction</option>
-                        <option value="#chapter1">1. Inference Engines</option>
-                        <option value="#chapter2">2. Quantisation Formats</option>
-                        <option value="#chapter3">3. Fine-Tuning &amp; PEFT</option>
-                        <option value="#chapter4">4. Robust Evaluation</option>
-                        <option value="#chapter5">5. Our Pipeline Lessons</option>
-                        <option value="#chapter6">6. Agentic Dataset Prep</option>
-                        <option value="#chapter7">7. Project Run Guide</option>
-                        <option value="#chapter8">8. Advanced Deep Learning Optimization</option>
-                        <option value="#chapter9">9. Notebook Code Companion Guide</option>
+                        <optgroup label="Chapters">
+                            <option value="#chapter6">1. Agentic Dataset Prep</option>
+                            <option value="#chapter3">2. Fine-Tuning &amp; PEFT</option>
+                            <option value="#chapter2">3. Quantisation Formats</option>
+                            <option value="#chapter1">4. Inference Engines</option>
+                            <option value="#chapter4">5. Robust Evaluation</option>
+                            <option value="#chapter8">6. Advanced Optimization</option>
+                            <option value="#chapter5">7. Empirical Pipeline Lessons</option>
+                        </optgroup>
+                        <optgroup label="Project Artifacts">
+                            <option value="#chapter7">8. Project Run Guide</option>
+                            <option value="#chapter9">9. Notebook Walkthrough</option>
+                        </optgroup>
                     </select>
                 </div>
                 <button class="theme-toggle-btn" onclick="toggleTheme()">
@@ -1128,7 +1145,7 @@
         // Fuzzy search for table of contents / chapters
         function fuzzySearchTOC() {
             const query = document.getElementById('toc-search').value.toLowerCase();
-            const items = document.querySelectorAll('#nav-list li');
+            const items = document.querySelectorAll('.nav-menu li');
 
             items.forEach(item => {
                 const text = item.innerText.toLowerCase();
@@ -1149,7 +1166,7 @@
 
             // Update top bar breadcrumbs
             const label = element.querySelector('span').innerText;
-            document.getElementById('top-breadcrumbs').innerText = `Gemma 4 Fine-tuning encyclopaedia > ${label}`;
+            document.getElementById('top-breadcrumbs').innerText = `Gemma 4 Fine-tuning Encyclopaedia > ${label}`;
 
             const targetId = element.getAttribute('href');
             
