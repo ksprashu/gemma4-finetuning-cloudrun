@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Gemma 4 Fine-Tuning &amp; Inference Encyclopedia</title>
+    <title>Gemma 4 Fine-tuning encyclopaedia</title>
     <!-- Inter & JetBrains Mono Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -891,12 +891,12 @@
         <aside>
             <div class="brand-container">
                 <div class="brand-icon">G</div>
-                <div class="brand-title">Gemma 4 Manual</div>
+                <div class="brand-title">Gemma 4 Fine-tuning encyclopaedia</div>
             </div>
 
             <div class="search-wrapper">
                 <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                <input type="text" class="search-input" id="toc-search" placeholder="Search manual topics..." onkeyup="fuzzySearchTOC()">
+                <input type="text" class="search-input" id="toc-search" placeholder="Search encyclopedia..." onkeyup="fuzzySearchTOC()">
             </div>
 
             <div class="nav-section-title">Manual Chapters</div>
@@ -970,7 +970,7 @@
             
             <!-- Top Bar with controls -->
             <div class="top-bar">
-                <div class="breadcrumbs" id="top-breadcrumbs">Gemma 4 Fine-Tuning &amp; Serving Encyclopedia &gt; Introduction</div>
+                <div class="breadcrumbs" id="top-breadcrumbs">Gemma 4 Fine-tuning encyclopaedia &gt; Introduction</div>
                 <!-- Responsive Mobile Chapter Navigation Dropdown -->
                 <div class="mobile-nav-container">
                     <select id="mobile-chapter-select" onchange="window.location.hash = this.value; const link = document.querySelector('.nav-item[href=\'' + this.value + '\']'); if (link) { setActiveNav(null, link); }">
@@ -3767,8 +3767,6 @@ spec:
                     </div>
                     <div class="quiz-feedback" style="display: none;"></div>
                 </div>
-                    <div class="quiz-feedback" style="display: none;"></div>
-                </div>
             </article>
 
 
@@ -4647,7 +4645,7 @@ for pr in test_reviews:
 
             // Update top bar breadcrumbs
             const label = element.querySelector('span').innerText;
-            document.getElementById('top-breadcrumbs').innerText = `Gemma 4 Fine-Tuning & Serving Encyclopedia > ${label}`;
+            document.getElementById('top-breadcrumbs').innerText = `Gemma 4 Fine-tuning encyclopaedia > ${label}`;
 
             const targetId = element.getAttribute('href');
             
