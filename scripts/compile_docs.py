@@ -19,7 +19,7 @@ def main():
     src_dir = os.path.join(kb_dir, "src")
     chapters_dir = os.path.join(src_dir, "chapters")
     shell_template_path = os.path.join(src_dir, "shell_template.html")
-    output_index_path = os.path.join(kb_dir, "index.html")
+    output_index_path = os.path.join(base_dir, "index.html")
     
     print("====================================================")
     print("  Gemma 4 Encyclopaedia Compiler - Building Production")
