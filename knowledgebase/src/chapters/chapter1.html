@@ -1,0 +1,338 @@
+            <!-- CHAPTER 1: MODEL RUNTIMES -->
+            <article id="chapter1">
+                <span class="book-badge">Chapter 1</span>
+                <h2>Mainstream Model Runtimes &amp; Inference Engines</h2>
+                <p>The runtime you wrap around model weights dictates your serving efficiency. In server-side serving, memory throughput determines single-stream speed, while batch execution models dictate overall concurrent requests capacities. Let's inspect the six mainstream open architectures.</p>
+
+                <h3>1. vLLM: High-Concurrency Cloud Serving</h3>
+                <p><strong>Under the Hood:</strong> vLLM is an engine designed specifically for high-concurrency server deployments. Its core innovation is <strong>PagedAttention</strong> (Kwon et al., 2023). Traditional transformers pre-allocate static memory for the Key-Value (KV) cache of every sequence based on maximum context lengths. This design fragments memory up to 80% with unused gaps (internal, external, and reservation overheads). PagedAttention behaves like virtual paging in operating systems--dividing the KV cache of each sequence into fixed-size physical blocks mapped dynamically, liberating VRAM to scale batch sizes by 10x without memory exhaustion.</p>
+                
+                <h4>Logical-to-Physical Block Translation</h4>
+                <p>Let $s$ represent a sequence. The key-value states for token position $i$ are mapped to a specific physical block and slot index within that block:</p>
+                <ul>
+                    <li><strong>Block Size ($B$):</strong> The fixed number of tokens per block (typically $B = 16$ or $B = 32$).</li>
+                    <li><strong>Logical Block Index ($lb$):</strong> The index of the block in the sequence's logical timeline:
+                        <div class="math-block" style="text-align: center;">
+                            $$lb = \lfloor i / B \rfloor$$
+                        </div>
+                    </li>
+                    <li><strong>Block Offset / Slot Index ($offset$):</strong> The position of the token within its block:
+                        <div class="math-block" style="text-align: center;">
+                            $$offset = i \pmod B$$
+                        </div>
+                    </li>
+                    <li><strong>Block Table Function ($\mathcal{M}(s, lb)$):</strong> A mapping table maintained by the vLLM scheduler that translates the logical block index $lb$ of sequence $s$ to a physical block frame number $P \in \mathbb{N}$ in GPU VRAM:
+                        <div class="math-block" style="text-align: center;">
+                            $$\mathcal{M}(s, \lfloor i / B \rfloor) = P$$
+                        </div>
+                    </li>
+                </ul>
+                <p>The physical address of the key or value vector for token $i$ at layer $l$ is calculated dynamically as:</p>
+                <div class="math-block" style="text-align: center;">
+                    $$\text{Physical Address}(i, l) = \text{BaseAddress}\left(\mathcal{M}\left(s, \lfloor i / B \rfloor\right)\right) + (i \pmod B) \times \text{SlotSize}_l$$
+                </div>
+                <p>Where the slot size (in bytes) is:
+                    $$\text{SlotSize}_l = 2 \times H_{kv} \times D_{\text{head}} \times 2 \text{ bytes (for FP16/BF16)}$$
+                </p>
+                <p>Here, the leading multiplier $2$ accounts for the separate storage of both the Key and Value vectors for each token. $H_{kv}$ represents the number of Key-Value attention heads standard in Grouped-Query Attention (GQA), which is typically smaller than the number of Query attention heads (e.g., 4 or 8 in Gemma 2/4). This distinction prevents severe overestimation of physical memory requirements.</p>
+
+                <h4>Attention Computation using PagedAttention</h4>
+                <p>During the decoding phase, when a new query token $q_i$ arrives, the attention score $A_{i, j}$ between $q_i$ and all historical key tokens $k_j$ ($j \le i$) is computed. Instead of assuming linear memory layout, the custom CUDA attention kernel loops over physical pages:</p>
+                <div class="math-block" style="text-align: center;">
+                    $$A_{i, j} = \frac{q_i \cdot K[\mathcal{M}(s, \lfloor j/B \rfloor), j \pmod B]^T}{\sqrt{D_{\text{head}}}}$$
+                </div>
+                <p>Where $K[P, offset]$ directly accesses the physical memory offset within page $P$ on the GPU. This eliminates contiguous memory constraints completely, reducing KV cache fragmentation to less than 4% of total VRAM.</p>
+
+                <h4>Copy-on-Write (CoW) for Parallel Sampling</h4>
+                <p>PagedAttention enables efficient prompt sharing during parallel sampling or beam search. When generating multiple responses from a single prompt, the prompt’s physical blocks are shared across sequences. When a shared block requires editing (e.g., if writing new tokens to a partially-filled block), the vLLM scheduler increments the reference count. If multiple sequences write to a shared block, the scheduler copies the block's physical content to a new frame, decrements the reference count of the old frame, and maps the sequence to the new frame. This <strong>Copy-on-Write (CoW)</strong> allocation allows zero-overhead multi-candidate sampling.</p>
+
+                <p><strong>Deployment Stack:</strong> Best-suited for hosting OpenAI-compatible endpoints on discrete GPUs in GCP GKE or Cloud Run. For more information, refer to the <a href="https://docs.vllm.ai/en/latest/" target="_blank">Official vLLM Documentation</a>.</p>
+                
+                <div class="code-header"><span>vLLM Serving Startup CLI</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-bash"># Serve Gemma 4 E4B Instruct with on-the-fly FP8 quantisation
+python3 -m vllm.entrypoints.openai.api_server \
+    --model google/gemma-4-e4b-it \
+    --quantization fp8 \
+    --enable-prefix-caching \
+    --gpu-memory-utilization 0.90 \
+    --port 8000</code></pre>
+
+                <h3>2. Hugging Face Transformers</h3>
+                <p><strong>Under the Hood:</strong> Hugging Face remains the absolute gold standard for developer research, prototyping, and PEFT adapter integration. It is a highly modular, PyTorch-native abstraction layer. Although uncompiled dynamic graph execution in PyTorch introduces minor latency, modern Transformers optimizes this out via <strong>Scaled Dot-Product Attention (SDPA)</strong>, <code>bitsandbytes</code> quantisation bindings, and direct model compilation on Hugging Face <code>optimum</code>.</p>
+                <p>To learn more, check out the <a href="https://huggingface.co/docs/transformers/index" target="_blank">Official HF Transformers Docs</a> and the <a href="https://huggingface.co/docs/peft/index" target="_blank">Official HF PEFT Docs</a>.</p>
+                
+                <div class="code-header"><span>Hugging Face Transformers Generation</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+# Configure 4-bit NormalFloat quantisation for VRAM containment
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.float16
+)
+
+tokenizer = AutoTokenizer.from_pretrained("google/gemma-4-e2b-it")
+model = AutoModelForCausalLM.from_pretrained(
+    "google/gemma-4-e2b-it",
+    quantization_config=bnb_config,
+    device_map="auto"
+)
+
+messages = [{"role": "user", "content": "How do you avoid VRAM fragmentation?"}]
+prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+
+with torch.no_grad():
+    outputs = model.generate(**inputs, max_new_tokens=256)
+print(tokenizer.decode(outputs[0], skip_special_tokens=True))</code></pre>
+
+                <h3>3. Apple MLX</h3>
+                <p><strong>Under the Hood:</strong> MLX is Apple's specialized array framework tailored natively for Apple Silicon (M1/M2/M3/M4 chips). It bypasses standard GPU/CPU system data transfer structures entirely by exploiting Apple's <strong>Unified Memory Architecture (UMA)</strong>. The CPU and GPU share a single physical memory pool--enabling Zero-Copy mechanics where weights loaded onto Apple Silicon require zero bus overhead or copying step between processing elements.</p>
+                <ul>
+                    <li><strong>Zero-Copy Performance:</strong> Loading a 4-bit quantized Gemma model into MLX maps the weights directly from disk into Unified Memory. The weights are read by GPU computing kernels directly, completely eliminating memory duplication and copy overhead.</li>
+                    <li><strong>Lazy Evaluation:</strong> MLX uses a lazy evaluation engine. No calculations are executed when code is written; instead, MLX builds a directed acyclic graph (DAG) of the operations. Execution is deferred until the user explicitly reads or prints the array contents, enabling deep graph-level compiler optimizations.</li>
+                </ul>
+                <p>For official examples and APIs, see the <a href="https://github.com/ml-explore/mlx" target="_blank">Official Apple MLX Repository</a> and the <a href="https://github.com/ml-explore/mlx-examples/tree/main/llms" target="_blank">Official MLX-LM Framework Examples</a>.</p>
+
+                <div class="code-header"><span>Complete MLX Inference & Low-Level Dequantization Script</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import mlx.core as mx
+import mlx.nn as nn
+from mlx_lm import load, generate
+
+def run_high_level_mlx():
+    """
+    Demonstrates native zero-copy loading and generation using mlx-lm.
+    """
+    # Load 4-bit quantized Gemma model from HF. 
+    # MLX-LM automatically utilizes Apple Unified Memory with zero-copy loading.
+    model_id = "mlx-community/gemma-2-9b-it-4bit"
+    print(f"[MLX] Loading native 4-bit model from: {model_id}")
+    
+    model, tokenizer = load(model_id)
+    
+    # Format prompt using Gemma's chat template
+    messages = [{"role": "user", "content": "Explain unified memory in Apple Silicon."}]
+    prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    
+    print("[MLX] Starting zero-copy inference execution...\n")
+    # Generates tokens dynamically with GPU acceleration
+    response = generate(
+        model=model,
+        tokenizer=tokenizer,
+        prompt=prompt,
+        max_tokens=200,
+        temp=0.7,
+        verbose=True
+    )
+    return response
+
+
+class MLXQuantizedLinear(nn.Module):
+    """
+    Under-the-hood representation of how MLX performs 4-bit dequantization
+    and matrix multiplication directly in Apple Unified Memory.
+    """
+    def __init__(self, in_features: int, out_features: int, bits: int = 4, group_size: int = 64):
+        super().__init__()
+        self.bits = bits
+        self.group_size = group_size
+        self.in_features = in_features
+        self.out_features = out_features
+        
+        # In MLX, quantized weights are stored as uint32 indices alongside scale and bias vectors
+        # All allocations are initialized directly in Unified Memory.
+        self.weight = mx.zeros((out_features, in_features // (32 // bits)), dtype=mx.uint32)
+        self.scales = mx.zeros((out_features, in_features // group_size), dtype=mx.float16)
+        self.biases = mx.zeros((out_features, in_features // group_size), dtype=mx.float16)
+
+    def __call__(self, x: mx.array) -> mx.array:
+        """
+        Runs on-the-fly dequantization and matmul within GPU unified memory.
+        """
+        # mx.quantized_matmul compiles into custom Metal Shading Language (MSL) kernels,
+        # executing dequantization directly inside the GPU registers to avoid VRAM bandwidth bottlenecks.
+        return mx.quantized_matmul(
+            x, 
+            self.weight, 
+            self.scales, 
+            self.biases, 
+            transpose=True, 
+            bits=self.bits, 
+            group_size=self.group_size
+        )
+
+if __name__ == "__main__":
+    # Run high-level inference demonstration
+    run_high_level_mlx()</code></pre>
+
+                <h3>4. Google LiteRT &amp; LiteRT-LM</h3>
+                <p><strong>Under the Hood:</strong> LiteRT (formerly TensorFlow Lite) is Google's high-efficiency on-device runtime. By compiling model graphs down into flatbuffer schema files (<code>.tflite</code> / <code>.litertlm</code>), it strips Python dependencies and compiles optimized execution nodes for local NPUs, Android/iOS devices, or edge browsers using hardware-level backends like XNNPACK or WebGPU.</p>
+                <ul>
+                    <li><strong>Flatbuffer Serialization:</strong> Packaging the compiled network graph, fused operators, and quantized weights into a single binary flatbuffer schema file (<code>.task</code> / <code>.tflite</code>). This enables zero-copy deserialization where weights are mapped directly into system memory, avoiding allocation overhead.</li>
+                    <li><strong>Operator Fusion:</strong> Complex operations like multi-head attention (MHA) and layer normalization are fused into single highly-optimized kernels to eliminate runtime dispatch latency.</li>
+                </ul>
+                <p>For more information, see the <a href="https://ai.google.dev/edge/litert" target="_blank">Official Google LiteRT-LM Documentation</a>.</p>
+
+                <div class="code-header"><span>LiteRT-LM Python On-Device Inference</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import os
+import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import text
+
+def run_litert_inference():
+    # Path to the compiled LiteRT flatbuffer LLM task
+    # This file contains the fused model graph and 4-bit quantized Gemma weights.
+    model_path = "gemma-2b-it-gpu.task"
+    
+    if not os.path.exists(model_path):
+        print(f"Please compile or download the LiteRT model to '{model_path}' before running.")
+        return
+
+    print(f"[LiteRT-LM] Initializing LLM engine from: {model_path}")
+    
+    # Configure options with hardware delegation (Metal on macOS, OpenCL/Vulkan on Android)
+    options = text.LlmInference.Options(
+        model_path=model_path,
+        max_results=256,
+        temperature=0.7,
+        top_k=40,
+    )
+    
+    # Initialize the generator task
+    with text.LlmInference.create_from_options(options) as generator:
+        prompt = "Define the purpose of a flatbuffer format in edge AI."
+        print(f"\nPrompt: {prompt}\n")
+        
+        # 1. Synchronous generation
+        response = generator.generate_response(prompt)
+        print(f"Response: {response}\n")
+        
+        # 2. Asynchronous / Streaming generation demonstration
+        print("Streaming response:")
+        def stream_callback(partial_text, done):
+            print(partial_text, end="", flush=True)
+            
+        generator.generate_response_async(
+            "List three key features of LiteRT-LM.", 
+            stream_callback
+        )
+        print()
+
+if __name__ == "__main__":
+    run_litert_inference()</code></pre>
+
+                <div class="code-header"><span>LiteRT-LM C++ Low-Latency Inference</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-cpp">#include &lt;iostream&gt;
+#include &lt;string&gt;
+#include "mediapipe/tasks/cc/text/llm_inference/llm_inference.h"
+
+using namespace mediapipe::tasks::text::llm_inference;
+
+int main() {
+    // 1. Initialize LiteRT-LM configuration options
+    LlmInference::Options options;
+    options.model_path = "/var/mobile/gemma-2b-it-gpu.task";
+    options.max_results = 256;
+    options.temperature = 0.7;
+    options.top_k = 40;
+
+    // 2. Instantiate the inference engine
+    std::cout &lt;&lt; "Loading LiteRT-LM model..." &lt;&lt; std::endl;
+    auto generator = LlmInference::CreateFromOptions(options);
+    if (!generator.ok()) {
+        std::cerr &lt;&lt; "Initialization failed: " &lt;&lt; generator.status().message() &lt;&lt; std::endl;
+        return -1;
+    }
+
+    // 3. Run synchronous inference
+    std::string prompt = "Explain on-device quantization.";
+    std::cout &lt;&lt; "\nPrompt: " &lt;&lt; prompt &lt;&lt; std::endl;
+    
+    auto response = (*generator)-&gt;GenerateResponse(prompt);
+    if (response.ok()) {
+        std::cout &lt;&lt; "Response:\n" &lt;&lt; *response &lt;&lt; std::endl;
+    } else {
+        std::cerr &lt;&lt; "Inference failed: " &lt;&lt; response.status().message() &lt;&lt; std::endl;
+    }
+
+    return 0;
+}</code></pre>
+
+                <h3>5. llama.cpp &amp; Ollama</h3>
+                <p><strong>Under the Hood:</strong> <code>llama.cpp</code> is a pure, zero-dependency C/C++ implementation of the transformer architecture designed by Georgi Gerganov. It is the absolute king of local CPU/GPU cross-platform execution. It maps model weights directly using <strong>mmap</strong> (avoiding virtual memory indexing bloat) and parses highly compressed <strong>GGUF</strong> files. <strong>Ollama</strong> runs a Go-based background daemon on top of llama.cpp, automating layer offloading and API serving.</p>
+                <p>Check out the <a href="https://github.com/ggerganov/llama.cpp" target="_blank">Official llama.cpp GitHub Repository</a> to get started.</p>
+
+                <!-- RUNTIMES COMPARISON TABLE -->
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Runtime Engine</th>
+                            <th>Target HW</th>
+                            <th>Memory Overhead</th>
+                            <th>Relative Throughput</th>
+                            <th>Primary Quantisation</th>
+                            <th>Ideal Use Case</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>vLLM</strong></td>
+                            <td>discrete GPU</td>
+                            <td>High (Pre-allocates cache)</td>
+                            <td>Ultra-High (10x concurrency)</td>
+                            <td>AWQ, GPTQ, FP8</td>
+                            <td>High-scale Cloud Serving APIs</td>
+                        </tr>
+                        <tr>
+                            <td><strong>HF Transformers</strong></td>
+                            <td>CUDA, ROCm, CPU</td>
+                            <td>Medium</td>
+                            <td>Low-Medium</td>
+                            <td>NF4, double quant, INT8</td>
+                            <td>Prototyping &amp; PEFT adapter training</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Apple MLX</strong></td>
+                            <td>Apple Silicon</td>
+                            <td>Ultra-Low (Zero-copy)</td>
+                            <td>High</td>
+                            <td>MLX-4bit, MLX-8bit</td>
+                            <td>Local Mac Development &amp; Serving</td>
+                        </tr>
+                        <tr>
+                            <td><strong>LiteRT / LiteRT-LM</strong></td>
+                            <td>Mobile, Web, Edge</td>
+                            <td>Ultra-Low</td>
+                            <td>High (on local hardware)</td>
+                            <td>FP8, INT4, INT8</td>
+                            <td>On-device Android/iOS and edge browsers</td>
+                        </tr>
+                        <tr>
+                            <td><strong>llama.cpp</strong></td>
+                            <td>CPU, macOS, Edge</td>
+                            <td>Low</td>
+                            <td>Medium-High</td>
+                            <td>GGUF (Q4_K_M, Q5_K_M)</td>
+                            <td>Local consumer desktop deployments</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- CHAPTER 1 QUIZ -->
+                <div class="quiz-container">
+                    <div class="quiz-question">Knowledge Check: Why does vLLM's PagedAttention dramatically outperform traditional Hugging Face Transformers serving on concurrent serving?</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Exactly! PagedAttention breaks the Key-Value cache of each sequence into fixed-size physical memory pages, eliminating internal fragmentation and letting you scale batch sizes without VRAM blowout.')">
+                            A) It divides KV cache tensors into fixed-size virtual pages, completely eliminating VRAM fragmentation.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Model weights are static. The dynamic memory blowout during concurrent serving is driven by the dynamic KV cache of active user threads.')">
+                            B) It compresses the static model weights into lower precision arrays dynamically during forward runs.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. While continuous batching helps with iteration-level scheduling, PagedAttention specifically solves the raw physical memory management.')">
+                            C) It bypasses GPU hardware boundaries entirely to run on system RAM.
+                        </div>
+                    </div>
+                    <div class="quiz-feedback"></div>
+                </div>
+            </article>

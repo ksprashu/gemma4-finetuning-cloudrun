@@ -1,0 +1,232 @@
+            <!-- CHAPTER 2: QUANTISATION FORMATS -->
+            <article id="chapter2">
+                <span class="book-badge">Chapter 2</span>
+                <h2>LLM Quantisation Formats under the Hood</h2>
+                <p>To deploy LLMs efficiently, we must move past standard FP16 floating-point formats. Autoregressive decoding is strictly memory-bandwidth bound--your GPU tensor cores sit idle waiting for weights to travel from high-bandwidth memory (HBM) to on-chip SRAM cache. Quantisation directly reduces weight sizes to speed up memory transfer.</p>
+
+                <h3>Mathematical Foundations</h3>
+                <p>Quantisation maps continuous, high-precision weights \(w \in \mathbb{R}\) into discrete, lower-precision integers \(q \in \mathbb{Z}\). In asymmetric (affine) quantisation, this mapping is established via a positive scale factor \(S \in \mathbb{R}^+\) and an integer zero-point \(Z \in \mathbb{Z}\):</p>
+                
+                <div class="math-block">
+                    <strong>Asymmetric (Affine) Quantisation Formula:</strong>
+                    $$q = \text{clip}\left(\text{round}\left(\frac{w}{S}\right) + Z, \ q_{\min}, \ q_{\max}\right)$$
+                    
+                    <strong>Dequantisation Formula (Restoring Approximated Weights):</strong>
+                    $$\tilde{w} = S \times (q - Z) \approx w$$
+
+                    <strong>Scale factor \(S\) and Zero-Point \(Z\) Derivation:</strong>
+                    $$S = \frac{w_{\max} - w_{\min}}{q_{\max} - q_{\min}} \quad ; \quad Z = \text{round}\left( q_{\min} - \frac{w_{\min}}{S} \right)$$
+                    
+                    Where \([w_{\min}, w_{\max}]\) is the clipping range of real weights, and \([q_{\min}, q_{\max}]\) is the target range of quantized integer bins (e.g., \([0, 15]\) for 4-bit unsigned integers or \([-8, 7]\) for 4-bit signed integers).
+                </div>
+
+                <h3>Traditional formats &amp; Activations Outliers</h3>
+                <p><strong>The Outlier Crisis:</strong> When LLMs exceed 6.7B parameters, specific activation channels begin emitting massive magnitude outliers (e.g. 100x larger than average). In symmetric quantisation, the scale factor \(S\) is forced to expand to accommodate these outliers, crushing the representational capacity of standard values to just a few integers (like -1, 0, 1), destroying model accuracy.</p>
+
+                <h3>Advanced Formats Bibliography</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Quantization Format</th>
+                                <th>Main Author / Group</th>
+                                <th>Affiliation</th>
+                                <th>Paper Title</th>
+                                <th>Publishing Venue / Year</th>
+                                <th>Direct Link</th>
+                                <th>Core Algorithmic Focus</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>LLM.int8()</strong></td>
+                                <td>Tim Dettmers et al.</td>
+                                <td>University of Washington</td>
+                                <td><em>LLM.int8(): 8-bit Matrix Multiplication for Transformers at Scale</em></td>
+                                <td>NeurIPS 2022</td>
+                                <td><a href="https://arxiv.org/abs/2208.07339" target="_blank">arXiv:2208.07339</a></td>
+                                <td>Identifies emergent activation outliers ($>6.7\text{B}$) and separates them into FP16 computation branches.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>AWQ</strong></td>
+                                <td>Ji Lin et al.</td>
+                                <td>MIT</td>
+                                <td><em>AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration</em></td>
+                                <td>MLSys 2024</td>
+                                <td><a href="https://arxiv.org/abs/2306.00978" target="_blank">arXiv:2306.00978</a></td>
+                                <td>Offline search for weight coordinate scaling multipliers to protect top 1% salient activation channels.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>GPTQ</strong></td>
+                                <td>Elias Frantar et al.</td>
+                                <td>IST Austria &amp; ETH Zurich</td>
+                                <td><em>GPTQ: Accurate Post-Training Quantization for Generative Pre-trained Transformers</em></td>
+                                <td>ICLR 2023</td>
+                                <td><a href="https://arxiv.org/abs/2210.17323" target="_blank">arXiv:2210.17323</a></td>
+                                <td>Inverse-Hessian second-order error correction using Cholesky precomputation and lazy updates.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>QLoRA (NF4)</strong></td>
+                                <td>Tim Dettmers et al.</td>
+                                <td>University of Washington</td>
+                                <td><em>QLoRA: Efficient Finetuning of Quantized LLMs</em></td>
+                                <td>NeurIPS 2023</td>
+                                <td><a href="https://arxiv.org/abs/2305.14314" target="_blank">arXiv:2305.14314</a></td>
+                                <td>Quantile-based NormalFloat4 representation with Double Quantization to compress scale footprints.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>SmoothQuant</strong></td>
+                                <td>Guangxuan Xiao et al.</td>
+                                <td>MIT &amp; NVIDIA</td>
+                                <td><em>SmoothQuant: Accurate and Efficient Post-Training Quantization for LLMs</em></td>
+                                <td>ICML 2023</td>
+                                <td><a href="https://arxiv.org/abs/2211.10438" target="_blank">arXiv:2211.10438</a></td>
+                                <td>Dynamically migrates activation outlier scale to static weight channels using an offline hyperparameter.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>The GGUF File Format &amp; Binary Layout</h3>
+                <p>The <strong>GGUF (GPT-Generated Unified Format)</strong> is a single-file binary serialization format designed for fast memory-mapped (<code>mmap</code>) loading and high-performance inference with runtimes like <code>llama.cpp</code>. Unlike older formats, GGUF aligns all tensor data to pre-configured byte boundaries (typically 32 or 64 bytes) to satisfy CPU and GPU SIMD register alignment requirements, completely bypassing runtime deserialization copy cycles.</p>
+                
+                <div class="code-header"><span>GGUF Physical Binary Layout</span></div>
+                <pre><code class="language-text">
++--------------------------------------------------------------+
+|                         GGUF FILE HEADER                     |
+|  Magic Number (4 bytes): "GGUF" (0x46554747)                 |
+|  Version (4 bytes): uint32_t (e.g., 3)                       |
+|  Tensor Count (8 bytes): uint64_t                            |
+|  Metadata KV Count (8 bytes): uint64_t                       |
++--------------------------------------------------------------+
+|                      METADATA KV PAIRS                       |
+|  +--------------------------------------------------------+  |
+|  | KV Pair #1:                                            |  |
+|  | - Key (String: uint64_t length + UTF-8 raw bytes)      |  |
+|  | - Type (uint32_t): e.g., GGUF_TYPE_STRING             |  |
+|  | - Value: "Gemma-2-9b-it"                               |  |
+|  +--------------------------------------------------------+  |
+|  | KV Pair #2:                                            |  |
+|  | - Key: "general.architecture"                          |  |
+|  | - Type: GGUF_TYPE_STRING                               |  |
+|  | - Value: "gemma2"                                      |  |
+|  +--------------------------------------------------------+  |
+|  | ... (Repeated KV Count times)                          |  |
++--------------------------------------------------------------+
+|                         TENSOR INFO                          |
+|  +--------------------------------------------------------+  |
+|  | Tensor Info #1 (e.g., "token_embd.weight"):            |  |
+|  | - Name (String: uint64_t length + raw bytes)            |  |
+|  | - Dimensions Count (uint32_t): e.g., 2                 |  |
+|  | - Dimensions (array of uint64_t): [256000, 3072]       |  |
+|  | - GGML Type (uint32_t): e.g., GGML_TYPE_Q4_K           |  |
+|  | - Offset (uint64_t): byte offset from raw data start   |  |
+|  +--------------------------------------------------------+  |
+|  | ... (Repeated Tensor Count times)                      |  |
++--------------------------------------------------------------+
+|                         ALIGNMENT PADDING                    |
+|  Zeros added to pad the stream to global alignment block     |
+|  (typically aligned to 32 or 64 bytes for AVX/NEON/CUDA)     |
++--------------------------------------------------------------+
+|                    BINARY TENSOR DATA BLOCKS                  |
+|  +--------------------------------------------------------+  |
+|  | Raw Tensor 1 Data (e.g. quantized Q4_K blocks)         |  |
+|  +--------------------------------------------------------+  |
+|  | Padding bytes for Alignment                            |  |
+|  +--------------------------------------------------------+  |
+|  | Raw Tensor 2 Data                                      |  |
+|  +--------------------------------------------------------+  |
+|  | ...                                                    |  |
++--------------------------------------------------------------+
+                </code></pre>
+
+                <p>The GGUF binary block is split into the following sequential regions:</p>
+                <ol>
+                    <li><strong>Magic Header (24 bytes):</strong> Begins with the magic number <code>0x46554747</code> (the ASCII string "GGUF") followed by format version, tensor count, and key-value metadata count.</li>
+                    <li><strong>Metadata KV Pairs:</strong> Self-documenting config pairs. Each key is serialized as a <code>uint64_t</code> string length and raw UTF-8 bytes. The value type is specified by a <code>uint32_t</code> identifier.</li>
+                    <li><strong>Tensor Info Block:</strong> A detailed dictionary describing every tensor, including its name, dimension counts, dimensions arrays, GGML quantisation type (e.g. Q4_K, FP16), and exact byte offset.</li>
+                    <li><strong>Alignment Padding:</strong> Metadata blocks are padded with zeros to ensure the tensor payload begins exactly on a 32 or 64-byte boundary. This allows the file to be direct-mapped using the <code>mmap()</code> system call for hardware SIMD registers execution.</li>
+                    <li><strong>Binary Tensor Data Blocks:</strong> Raw quantized weights packed sequentially, padded individually to satisfy memory boundaries.</li>
+                </ol>
+
+                <h3>Practical Quantization Implementations</h3>
+                
+                <div class="code-header"><span>HuggingFace Loading (bitsandbytes INT8/NF4)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+model_id = "google/gemma-2-9b-it"
+
+# Configure 4-bit NormalFloat (NF4) quantization with double quantization
+quantization_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_compute_dtype=torch.bfloat16
+)
+
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    quantization_config=quantization_config,
+    device_map="auto"
+)</code></pre>
+
+                <div class="code-header"><span>vLLM Serving (AWQ Quantized Model)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">from vllm import LLM, SamplingParams
+
+# Initialize vLLM with an offline-compiled AWQ model
+llm = LLM(
+    model="google/gemma-2-9b-it-awq",
+    quantization="awq",
+    tensor_parallel_size=1
+)
+
+sampling_params = SamplingParams(temperature=0.7, top_p=0.9, max_tokens=128)
+outputs = llm.generate(["Explain quantization in one sentence."], sampling_params)
+print(outputs[0].outputs[0].text)</code></pre>
+
+                <div class="code-header"><span>Transformers Loading (AutoGPTQ)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+quantized_model_dir = "TheBloke/gemma-2-9b-it-GPTQ"
+tokenizer = AutoTokenizer.from_pretrained(quantized_model_dir, use_fast=True)
+
+model = AutoModelForCausalLM.from_pretrained(
+    quantized_model_dir,
+    device_map="auto",
+    torch_dtype=torch.float16
+)</code></pre>
+
+                <div class="code-header"><span>Compiling &amp; Quantizing via llama.cpp (GGUF)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-bash"># Clone and compile llama.cpp
+git clone https://github.com/ggerganov/llama.cpp
+cd llama.cpp && make -j
+
+# Convert HuggingFace checkpoint to GGUF FP16 format
+python3 convert_hf_to_gguf.py /path/to/gemma-2-9b-it/ \
+    --outtype f16 \
+    --outfile gemma-2-9b-it.f16.gguf
+
+# Quantize the FP16 GGUF to Q4_K_M (4-bit Medium) format
+./llama-quantize gemma-2-9b-it.f16.gguf gemma-2-9b-it.Q4_K_M.gguf Q4_K_M</code></pre>
+
+
+                <!-- CHAPTER 2 QUIZ -->
+                <div class="quiz-container">
+                    <div class="quiz-question">Knowledge Check: Why is NF4 (NormalFloat4) considered mathematically superior to standard INT4 for weight-only quantisation in QLoRA?</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. NF4 does not accelerate math; it is converted back to FP16/BF16 at runtime during forward passes.')">
+                            A) It utilizes native integer-based ALUs on mobile devices to bypass GPU hardware limits.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Spot on! NF4 allocates quantisation boundaries based on standard normal distributions, maximising entropy and ensuring every bin has equal capacity for normally-distributed weights.')">
+                            B) It maps quantization bins to equal-area intervals of a normal distribution, maximizing the Shannon entropy of the representation.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. AWQ and GPTQ rely on activation datasets; NF4 is static and optimal for standard normal weight shapes.')">
+                            C) It calibrates dynamic scale factors on the fly based on a custom training dataset.
+                        </div>
+                    </div>
+                    <div class="quiz-feedback"></div>
+                </div>
+            </article>

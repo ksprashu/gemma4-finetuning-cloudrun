@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Gemma 4 Fine-Tuning &amp; Inference Encyclopedia</title>
+    <!-- Inter & JetBrains Mono Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- KaTeX for beautiful math formulas -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body);"></script>
+
+    <!-- Prism.js for syntax highlighting (Tomorrow Night theme) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    
+    <!-- Custom CSS Styles -->
+    <style>
+        :root {
+            /* Theme CSS Custom Variables (Warm Light Mode Default) */
+            --bg-main: hsl(30, 20%, 98%);
+            --bg-card: hsl(0, 0%, 100%);
+            --bg-sidebar: hsl(30, 15%, 95%);
+            --border: hsl(30, 10%, 88%);
+            --text-primary: hsl(220, 25%, 12%);
+            --text-secondary: hsl(215, 15%, 35%);
+            --text-muted: hsl(215, 10%, 55%);
+            --primary: hsl(250, 75%, 50%);
+            --primary-hover: hsl(250, 80%, 45%);
+            --primary-light: hsl(250, 80%, 96%);
+            --accent-success: hsl(145, 65%, 36%);
+            --accent-warn: hsl(32, 95%, 44%);
+            --accent-error: hsl(355, 75%, 44%);
+            --terminal-bg: hsl(220, 25%, 10%);
+            --terminal-text: hsl(120, 80%, 75%);
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
+            --shadow-md: 0 8px 24px rgba(0,0,0,0.08);
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        [data-theme="dark"] {
+            /* Obsidian Dark Mode Variables */
+            --bg-main: hsl(220, 25%, 7%);
+            --bg-card: hsl(220, 22%, 11%);
+            --bg-sidebar: hsl(220, 20%, 9%);
+            --border: hsl(217, 16%, 18%);
+            --text-primary: hsl(210, 17%, 95%);
+            --text-secondary: hsl(215, 14%, 68%);
+            --text-muted: hsl(215, 10%, 45%);
+            --primary: hsl(245, 90%, 65%);
+            --primary-hover: hsl(245, 95%, 60%);
+            --primary-light: hsl(245, 40%, 15%);
+            --accent-success: hsl(142, 72%, 48%);
+            --accent-warn: hsl(32, 95%, 52%);
+            --accent-error: hsl(350, 85%, 56%);
+            --terminal-bg: hsl(222, 28%, 6%);
+            --terminal-text: hsl(142, 85%, 70%);
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.25);
+            --shadow-md: 0 12px 36px rgba(0,0,0,0.45);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100vh;
+            width: 100vw;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            line-height: 1.625;
+            -webkit-font-smoothing: antialiased;
+            transition: var(--transition);
+        }
+
+        /* Layout Architecture */
+        .app-container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        /* Sidebar Navigation */
+        aside {
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            padding: 1.5rem;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            transition: var(--transition);
+            z-index: 100;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .brand-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary), var(--accent-success));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .brand-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        .search-wrapper {
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.625rem 1rem 0.625rem 2.25rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.875rem;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            width: 16px;
+            height: 16px;
+            pointer-events: none;
+        }
+
+        .nav-menu {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            flex-grow: 1;
+        }
+
+        .nav-section-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.625rem 0.75rem;
+            border-radius: 6px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background-color: var(--bg-card);
+            color: var(--primary);
+        }
+
+        .nav-item.active {
+            font-weight: 600;
+            border-left: 3px solid var(--primary);
+            border-radius: 0 6px 6px 0;
+            padding-left: calc(0.75rem - 3px);
+        }
+
+        .progress-checkbox {
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border: 1.5px solid var(--text-muted);
+            border-radius: 3px;
+            cursor: pointer;
+            position: relative;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .progress-checkbox:checked {
+            background-color: var(--accent-success);
+            border-color: var(--accent-success);
+        }
+
+        .progress-checkbox:checked::after {
+            content: "✓";
+            position: absolute;
+            color: white;
+            font-size: 10px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+        }
+
+        /* Main Scrollable Area */
+        main {
+            padding: 2.5rem 3rem;
+            overflow-y: auto;
+            height: 100vh;
+            scroll-behavior: smooth;
+        }
+
+        /* Top Control Bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .breadcrumbs {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .theme-toggle-btn {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+        }
+
+        .theme-toggle-btn:hover {
+            border-color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        /* Typographic and Structural Articles */
+        article {
+            display: none;
+            max-width: 1050px;
+            margin-bottom: 5rem;
+            scroll-margin-top: 4rem;
+        }
+
+        article.active-page {
+            display: block;
+            animation: fadeIn 0.35s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .hero-section {
+            text-align: left;
+            margin-bottom: 4rem;
+        }
+
+        .book-badge {
+            background-color: var(--primary-light);
+            color: var(--primary);
+            padding: 0.375rem 0.875rem;
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 2.75rem;
+            font-weight: 800;
+            letter-spacing: -0.035em;
+            line-height: 1.15;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--text-primary), var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+            margin-bottom: 2rem;
+            max-width: 680px;
+        }
+
+        h2 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-top: 3rem;
+            margin-bottom: 1.25rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: -0.015em;
+            margin-top: 2rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.25rem;
+            line-height: 1.65;
+        }
+
+        ul, ol {
+            margin-left: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Diagrams & Media */
+        .media-container {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .media-image {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transition: var(--transition);
+        }
+
+        .media-image:hover {
+            transform: scale(1.01);
+        }
+
+        .media-caption {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 1rem;
+            font-style: italic;
+        }
+
+        /* Tables formatting */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            margin: 1.5rem 0 2.5rem 0;
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            background-color: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th {
+            background-color: var(--primary-light);
+            color: var(--primary);
+            font-weight: 700;
+            text-align: left;
+            padding: 0.875rem 1rem;
+            font-size: 0.875rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 0.875rem 1rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: var(--primary-light);
+            color: var(--text-primary);
+        }
+
+        /* Code Block Copy-Paste formatting */
+        pre {
+            background-color: hsl(220, 25%, 10%) !important;
+            border-radius: 8px !important;
+            padding: 1.25rem !important;
+            margin: 1.5rem 0 !important;
+            overflow-x: auto;
+            position: relative;
+            white-space: pre-wrap !important;
+            word-break: break-word !important;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace !important;
+            font-size: 0.875rem !important;
+            white-space: pre-wrap !important;
+            word-break: break-word !important;
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: hsl(220, 20%, 8%);
+            border-radius: 8px 8px 0 0;
+            padding: 0.5rem 1rem;
+            margin-bottom: -1.5rem;
+            border-bottom: 1px solid hsl(220, 20%, 15%);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .copy-code-btn {
+            background-color: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #d1d5db;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: var(--transition);
+        }
+
+        .copy-code-btn:hover {
+            background-color: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Mathematical equation custom display */
+        .math-block {
+            padding: 1rem;
+            background-color: var(--primary-light);
+            border-left: 4px solid var(--primary);
+            border-radius: 0 8px 8px 0;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+
+        /* Widgets and Interactive Tools Elements */
+        .widget-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2.5rem 0;
+            box-shadow: var(--shadow-md);
+        }
+
+        .widget-title {
+            font-size: 1.35rem;
+            font-weight: 700;
+            letter-spacing: -0.015em;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--primary);
+        }
+
+        .widget-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        /* Interactive VRAM Calculator */
+        .vram-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 2rem;
+        }
+
+        /* Mobile navigation dropdown menu styles */
+        .mobile-nav-container {
+            display: none;
+        }
+
+        #mobile-chapter-select {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            cursor: pointer;
+            box-shadow: var(--shadow-sm);
+            outline: none;
+            max-width: 100%;
+        }
+
+        #mobile-chapter-select:focus {
+            border-color: var(--primary);
+        }
+
+        @media (max-width: 768px) {
+            .vram-grid {
+                grid-template-columns: 1fr;
+            }
+            .app-container {
+                grid-template-columns: 1fr;
+            }
+            aside {
+                display: none;
+            }
+            .mobile-nav-container {
+                display: block;
+            }
+            .breadcrumbs {
+                display: none;
+            }
+            main {
+                padding: 1.5rem 1.5rem;
+            }
+            .top-bar {
+                margin-bottom: 2rem;
+            }
+        }
+
+        .calc-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .form-control {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        select {
+            padding: 0.625rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            outline: none;
+            font-size: 0.875rem;
+            transition: var(--transition);
+        }
+
+        select:focus {
+            border-color: var(--primary);
+        }
+
+        .vram-results {
+            background-color: var(--primary-light);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 1.25rem;
+            text-align: center;
+        }
+
+        .vram-gauge {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            border: 10px solid var(--border);
+            border-top-color: var(--primary);
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        .gauge-value {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+
+        .gauge-unit {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .result-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            text-align: left;
+            font-size: 0.875rem;
+        }
+
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dashed var(--border);
+            padding-bottom: 0.25rem;
+        }
+
+        .gpu-status-pill {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .gpu-fit-ok {
+            background-color: var(--accent-success);
+            color: white;
+        }
+
+        .gpu-fit-fail {
+            background-color: var(--accent-error);
+            color: white;
+        }
+
+        /* Troubleshooting Simulator CLI Terminal element */
+        .terminal-emulator {
+            background-color: var(--terminal-bg);
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.825rem;
+            line-height: 1.5;
+            color: var(--terminal-text);
+            margin-top: 1rem;
+            overflow-x: auto;
+        }
+
+        .terminal-header {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 0.5rem;
+        }
+
+        .terminal-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .terminal-dot.red { background-color: #ef4444; }
+        .terminal-dot.yellow { background-color: #f59e0b; }
+        .terminal-dot.green { background-color: #10b981; }
+
+        .terminal-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            overflow-x: auto;
+        }
+
+        .terminal-tab-btn {
+            background-color: var(--bg-main);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            white-space: nowrap;
+            transition: var(--transition);
+        }
+
+        .terminal-tab-btn.active {
+            background-color: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Interactive Quiz & Knowledge Checks */
+        .quiz-container {
+            background-color: var(--bg-main);
+            border: 1.5px dashed var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .quiz-question {
+            font-weight: 700;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+
+        .quiz-options {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .quiz-option {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: var(--transition);
+        }
+
+        .quiz-option:hover {
+            border-color: var(--primary);
+            background-color: var(--primary-light);
+        }
+
+        .quiz-option.correct {
+            border-color: var(--accent-success);
+            background-color: hsla(145, 65%, 50%, 0.1);
+            color: var(--accent-success);
+        }
+
+        .quiz-option.incorrect {
+            border-color: var(--accent-error);
+            background-color: hsla(355, 75%, 50%, 0.1);
+            color: var(--accent-error);
+        }
+
+        .quiz-feedback {
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: none;
+        }
+
+        .quiz-feedback.success {
+            background-color: hsla(145, 65%, 50%, 0.1);
+            color: var(--accent-success);
+            border-left: 4px solid var(--accent-success);
+        }
+
+        .quiz-feedback.fail {
+            background-color: hsla(355, 75%, 50%, 0.1);
+            color: var(--accent-error);
+            border-left: 4px solid var(--accent-error);
+        }
+
+        /* Custom alert components */
+        .callout {
+            border-left: 4px solid var(--primary);
+            background-color: var(--primary-light);
+            padding: 1.25rem 1.5rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1.5rem 0;
+        }
+
+        .callout-title {
+            font-weight: 700;
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .callout-content {
+            font-size: 0.925rem;
+            color: var(--text-secondary);
+        }
+
+        .callout-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .callout.warn {
+            border-left-color: var(--accent-warn);
+            background-color: hsla(32, 95%, 50%, 0.05);
+        }
+        .callout.warn .callout-title { color: var(--accent-warn); }
+
+        .callout.danger {
+            border-left-color: var(--accent-error);
+            background-color: hsla(355, 75%, 50%, 0.05);
+        }
+        .callout.danger .callout-title { color: var(--accent-error); }
+
+        .tag {
+            display: inline-block;
+            padding: 0.15rem 0.4rem;
+            background-color: var(--border);
+            color: var(--text-secondary);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body data-theme="light">
+
+    <div class="app-container">
+        
+        <!-- Sidebar Navigation -->
+        <aside>
+            <div class="brand-container">
+                <div class="brand-icon">G</div>
+                <div class="brand-title">Gemma 4 Manual</div>
+            </div>
+
+            <div class="search-wrapper">
+                <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <input type="text" class="search-input" id="toc-search" placeholder="Search manual topics..." onkeyup="fuzzySearchTOC()">
+            </div>
+
+            <div class="nav-section-title">Manual Chapters</div>
+            <ul class="nav-menu" id="nav-list">
+                <li>
+                    <a href="#introduction" class="nav-item active" onclick="setActiveNav(event, this)">
+                        <span>Cover &amp; Introduction</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter1" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>1. Inference Engines</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter2" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>2. Quantisation Formats</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter3" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>3. Fine-Tuning &amp; PEFT</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter4" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>4. Robust Evaluation</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter5" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>5. Our Pipeline Lessons</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter6" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>6. Agentic Dataset Prep</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter7" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>7. Project Run Guide</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter8" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>8. Advanced Optimization</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+                <li>
+                    <a href="#chapter9" class="nav-item" onclick="setActiveNav(event, this)">
+                        <span>9. Notebook Walkthrough</span>
+                        <input type="checkbox" class="progress-checkbox" onclick="event.stopPropagation(); updateProgress()">
+                    </a>
+                </li>
+            </ul>
+
+        </aside>
+
+        <!-- Main Content Panel -->
+        <main>
+            
+            <!-- Top Bar with controls -->
+            <div class="top-bar">
+                <div class="breadcrumbs" id="top-breadcrumbs">Gemma 4 Fine-Tuning &amp; Serving Encyclopedia &gt; Introduction</div>
+                <!-- Responsive Mobile Chapter Navigation Dropdown -->
+                <div class="mobile-nav-container">
+                    <select id="mobile-chapter-select" onchange="window.location.hash = this.value; const link = document.querySelector('.nav-item[href=\'' + this.value + '\']'); if (link) { setActiveNav(null, link); }">
+                        <option value="#introduction" selected>Cover &amp; Introduction</option>
+                        <option value="#chapter1">1. Inference Engines</option>
+                        <option value="#chapter2">2. Quantisation Formats</option>
+                        <option value="#chapter3">3. Fine-Tuning &amp; PEFT</option>
+                        <option value="#chapter4">4. Robust Evaluation</option>
+                        <option value="#chapter5">5. Our Pipeline Lessons</option>
+                        <option value="#chapter6">6. Agentic Dataset Prep</option>
+                        <option value="#chapter7">7. Project Run Guide</option>
+                        <option value="#chapter8">8. Advanced Deep Learning Optimization</option>
+                        <option value="#chapter9">9. Notebook Code Companion Guide</option>
+                    </select>
+                </div>
+                <button class="theme-toggle-btn" onclick="toggleTheme()">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m11.314 11.314l.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"></path></svg>
+                    <span id="theme-btn-text">Dark Obsidian</span>
+                </button>
+            </div>
+
+            <!-- {{CHAPTERS_CONTENT}} -->
+
+        </main>
+    </div>
+
+    <!-- Interactive Scripts logic -->
+    <script>
+
+
+        // Run VRAM calculation algorithm
+        function calculateVRAM() {
+            const size = parseFloat(document.getElementById('param-size').value);
+            const bits = parseInt(document.getElementById('weight-precision').value);
+            const lora = parseInt(document.getElementById('lora-rank').value);
+            const context = parseInt(document.getElementById('context-window').value);
+            const taskType = document.getElementById('task-type').value;
+            const opMode = document.getElementById('operation-mode').value;
+
+            // Model weights footprint
+            // If multimodal, we incorporate the SigLIP visual encoder (SO400m) weights (+0.4 Billion parameters)
+            let modelWeightsMem = (size * bits) / 8;
+            if (taskType === 'multimodal') {
+                modelWeightsMem += (0.4 * bits) / 8;
+            }
+
+            // Exact KV Cache Configuration
+            let L = 32, H_kv = 8, D_head = 256;
+            if (size === 2.0) { L = 26; H_kv = 8; D_head = 256; }
+            else if (size === 4.0) { L = 32; H_kv = 8; D_head = 256; }
+            else if (size === 7.0) { L = 28; H_kv = 16; D_head = 256; }
+            else if (size === 9.0) { L = 42; H_kv = 8; D_head = 256; }
+
+            // Compute exact text-only KV cache
+            let kvCacheMem = (2 * L * H_kv * D_head * context * 2) / 1e9; // GB
+
+            // If multimodal, we incorporate the 729 visual tokens' KV Cache footprint
+            if (taskType === 'multimodal') {
+                // Formulated as: 2 * L * H_kv * D_head * T * 2 bytes
+                // Scaled by an active training/context buffer multiplier of 2
+                const visualKV = (4 * L * H_kv * D_head * 729 * 2) / 1e9; // GB
+                kvCacheMem += visualKV;
+            }
+
+            // LoRA / Trainer Overhead Calculation
+            let loraOverhead = 0;
+            let activationMem = 0;
+
+            const numProjections = 7;
+            let d_model = size * 1024; // fallback
+            if (size === 2.0) d_model = 2048;
+            else if (size === 4.0) d_model = 3072;
+            else if (size === 7.0) d_model = 4096;
+            else if (size === 9.0) d_model = 3584;
+
+            const paramsCount = numProjections * 2 * d_model * lora;
+
+            if (opMode === 'serving') {
+                loraOverhead = (paramsCount * 2) / 1e9; // static adapter weight size (GB)
+                activationMem = 0;
+            } else if (opMode === 'training') {
+                loraOverhead = (paramsCount * 16) / 1e9; // standard gradient/optimizer overhead (GB)
+                activationMem = 2.5; // gradient checkpointing footprint (GB)
+            }
+
+            // PyTorch activation overhead base buffer
+            const baseBuffer = 1.2;
+
+            const totalVRAM = (modelWeightsMem + kvCacheMem + loraOverhead + activationMem + baseBuffer).toFixed(2);
+
+            // Update UI elements
+            document.getElementById('vram-val').innerText = totalVRAM;
+            document.getElementById('w-mem').innerText = modelWeightsMem.toFixed(2) + " GB";
+            document.getElementById('kv-mem').innerText = kvCacheMem.toFixed(2) + " GB";
+            document.getElementById('lora-mem').innerText = (loraOverhead + activationMem).toFixed(2) + " GB";
+
+            // Status pills logic
+            updatePill('t4-pill', totalVRAM, 15);
+            updatePill('l4-pill', totalVRAM, 24);
+        }
+
+        function updatePill(elementId, vram, limit) {
+            const pill = document.getElementById(elementId);
+            if (parseFloat(vram) <= limit) {
+                pill.innerText = "Fits Safely";
+                pill.className = "gpu-status-pill gpu-fit-ok";
+            } else {
+                pill.innerText = "Will OOM";
+                pill.className = "gpu-status-pill gpu-fit-fail";
+            }
+        }
+
+
+
+        // Quiz checking
+        function checkQuizAnswer(element, status, feedbackText) {
+            const parent = element.parentElement;
+            const options = parent.querySelectorAll('.quiz-option');
+            const feedback = parent.nextElementSibling;
+
+            // Lock options
+            options.forEach(opt => {
+                opt.style.pointerEvents = 'none';
+                if (opt === element) {
+                    if (status === 'correct') opt.classList.add('correct');
+                    else opt.classList.add('incorrect');
+                }
+            });
+
+            // Set feedback
+            feedback.innerText = feedbackText;
+            feedback.style.display = 'block';
+            if (status === 'correct') {
+                feedback.className = "quiz-feedback success";
+            } else {
+                feedback.className = "quiz-feedback fail";
+            }
+        }
+
+        // Theme switching logic (Warm Light vs Obsidian Dark)
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = body.getAttribute('data-theme');
+            const btnText = document.getElementById('theme-btn-text');
+
+            if (currentTheme === 'light') {
+                body.setAttribute('data-theme', 'dark');
+                btnText.innerText = 'Warm Light';
+            } else {
+                body.setAttribute('data-theme', 'light');
+                btnText.innerText = 'Dark Obsidian';
+            }
+        }
+
+        // Fuzzy search for table of contents / chapters
+        function fuzzySearchTOC() {
+            const query = document.getElementById('toc-search').value.toLowerCase();
+            const items = document.querySelectorAll('#nav-list li');
+
+            items.forEach(item => {
+                const text = item.innerText.toLowerCase();
+                if (text.includes(query)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        // Active Navigation Highlighter (SPA Tab Switcher)
+        function setActiveNav(event, element) {
+            if (event) event.preventDefault();
+            const items = document.querySelectorAll('.nav-item');
+            items.forEach(item => item.classList.remove('active'));
+            element.classList.add('active');
+
+            // Update top bar breadcrumbs
+            const label = element.querySelector('span').innerText;
+            document.getElementById('top-breadcrumbs').innerText = `Gemma 4 Fine-Tuning & Serving Encyclopedia > ${label}`;
+
+            const targetId = element.getAttribute('href');
+            
+            // Keep the mobile select dropdown in sync
+            const mobileSelect = document.getElementById('mobile-chapter-select');
+            if (mobileSelect) {
+                mobileSelect.value = targetId;
+            }
+            
+            // Toggle active-page class across articles
+            document.querySelectorAll('main article').forEach(art => {
+                art.classList.remove('active-page');
+            });
+            
+            const targetElement = document.querySelector(targetId);
+            const mainElement = document.querySelector('main');
+            if (targetElement) {
+                targetElement.classList.add('active-page');
+                if (mainElement) {
+                    mainElement.scrollTop = 0;
+                }
+            }
+        }
+
+        // Code block copier
+        function copyCode(btn) {
+            const pre = btn.parentElement.nextElementSibling;
+            const code = pre.querySelector('code').innerText;
+
+            navigator.clipboard.writeText(code).then(() => {
+                btn.innerText = "Copied!";
+                setTimeout(() => btn.innerText = "Copy", 1500);
+            }).catch(err => {
+                btn.innerText = "Error";
+                setTimeout(() => btn.innerText = "Copy", 1500);
+            });
+        }
+
+        // Update overall manual reading progress bar or ticks
+        function updateProgress() {
+            // Check completed chapters
+            const checkboxes = document.querySelectorAll('.progress-checkbox');
+            let completed = 0;
+            checkboxes.forEach(cb => {
+                if (cb.checked) completed++;
+            });
+            
+            // Highlight sidebar icon slightly if progress is full
+            const brandIcon = document.querySelector('.brand-icon');
+            if (completed === checkboxes.length) {
+                brandIcon.innerText = "✓";
+                brandIcon.style.background = "linear-gradient(135deg, var(--accent-success), #10b981)";
+            } else {
+                brandIcon.innerText = "G";
+                brandIcon.style.background = "linear-gradient(135deg, var(--primary), var(--accent-success))";
+            }
+        }
+
+        // Real Step Guides database for the operations generator
+        const stepGuides = [
+            {
+                title: "Step 1: Dataset Generation & Synthesis",
+                subtitle: "Compile highly nuanced, custom dataset records covering edge cases.",
+                purpose: "Generates the training dataset. You can run the local programmatic script (Pathway A) or use Google Antigravity prompts (Pathway B) to synthesize thousands of complex samples.",
+                script: "scripts/run_step1_generate_dataset.sh",
+                interactive_cmd: `./scripts/run_step1_generate_dataset.sh`,
+                headless_cmd: `export DATASET_SIZE="2000"
+export OUTPUT_FILE="sentiment_dataset.jsonl"
+./scripts/run_step1_generate_dataset.sh`
+            },
+            {
+                title: "Step 2: Create GCS Bucket & Upload Dataset",
+                subtitle: "Provision durable bucket storage in an L4 GPU-capable region.",
+                purpose: "Resolves active GCP project, creates GCS bucket (if not already existing) and uploads the training file.",
+                script: "scripts/run_step2_upload_to_gcs.sh",
+                interactive_cmd: `./scripts/run_step2_upload_to_gcs.sh`,
+                headless_cmd: `export PROJECT_ID="{PROJECT_ID}"
+export BUCKET_NAME="{BUCKET_NAME}"
+export REGION="{REGION}"
+./scripts/run_step2_upload_to_gcs.sh`
+            },
+            {
+                title: "Step 3: Provision Secret & Training Image",
+                subtitle: "Register secrets, initialize Artifact Registry and build Docker image.",
+                purpose: "Secures your HuggingFace token in GCP Secret Manager, builds the custom QLoRA training Docker container and pushes it to Artifact Registry.",
+                script: "scripts/run_step3_deploy_training_job.sh",
+                interactive_cmd: `export HF_TOKEN="{HF_TOKEN}"
+./scripts/run_step3_deploy_training_job.sh`,
+                headless_cmd: `export PROJECT_ID="{PROJECT_ID}"
+export BUCKET_NAME="{BUCKET_NAME}"
+export REGION="{REGION}"
+export HF_TOKEN="{HF_TOKEN}"
+./scripts/run_step3_deploy_training_job.sh`
+            },
+            {
+                title: "Step 4: Execute Cloud Run Fine-Tuning Job",
+                subtitle: "Spin up serverless NVIDIA L4 GPU to perform backpropagation training.",
+                purpose: "Triggers execution of the registered training job. The container boots, pulls the dataset from GCS, downloads the quantized Gemma base model, runs training, and serializes final weights back to GCS.",
+                script: "gcloud run jobs execute",
+                interactive_cmd: `gcloud run jobs execute gemma-4-finetune --region={REGION}`,
+                headless_cmd: `gcloud run jobs execute gemma-4-finetune \\
+    --region={REGION} \\
+    --project={PROJECT_ID}`
+            },
+            {
+                title: "Step 5: Deploy Serving Service to Cloud Run",
+                subtitle: "Deploy FastAPI container with on-the-fly adapter mounting.",
+                purpose: "Builds the serving image and deploys the model service to Cloud Run. When the server boots, it downloads the base model and pulls your fine-tuned LoRA adapters dynamically from GCS, serving an OpenAI-compatible API.",
+                script: "scripts/run_step5_deploy_serving.sh",
+                interactive_cmd: `./scripts/run_step5_deploy_serving.sh`,
+                headless_cmd: `export PROJECT_ID="{PROJECT_ID}"
+export BUCKET_NAME="{BUCKET_NAME}"
+export REGION="{REGION}"
+./scripts/run_step5_deploy_serving.sh`
+            },
+            {
+                title: "Step 6: Test Inference Endpoints",
+                subtitle: "Exercise chat completions and prompt generation endpoints.",
+                purpose: "Runs a client script or raw curl query against the deployed endpoint to verify system health and classification accuracy.",
+                script: "scripts/run_step6_test_inference.sh",
+                interactive_cmd: `./scripts/run_step6_test_inference.sh`,
+                headless_cmd: `# Direct curl to Chat Completions
+curl -X POST "https://gemma-4-serve-xxxxxx.a.run.app/v1/chat/completions" \\
+     -H "Content-Type: application/json" \\
+     -d '{
+       "messages": [
+         {"role": "user", "content": "Classify sentiment: '\''Excellent framework!'\''"}
+       ]
+     }'`
+            },
+            {
+                title: "Step 7: Run Model Evaluation and Verification",
+                subtitle: "Verify precision scores and conversational tokens leakage.",
+                purpose: "Runs programmatic accuracy audits. Can test either the remote serving endpoint or load adapter weights locally in PyTorch.",
+                script: "scripts/run_step4_run_evaluation.sh",
+                interactive_cmd: `./scripts/run_step4_run_evaluation.sh`,
+                headless_cmd: `export PROJECT_ID="{PROJECT_ID}"
+export REGION="{REGION}"
+export EVAL_MODE=1  # 1 = Remote Service, 2 = Local PyTorch
+./scripts/run_step4_run_evaluation.sh`
+            }
+        ];
+
+        let activeGenStep = 0;
+
+        function switchGenStep(index) {
+            activeGenStep = index;
+            // Update active tab buttons
+            const tabs = document.querySelectorAll('.gen-step-tab');
+            tabs.forEach((tab, idx) => {
+                if (idx === index) tab.classList.add('active');
+                else tab.classList.remove('active');
+            });
+            updateGenCommands();
+        }
+
+        function updateGenCommands() {
+            const project = document.getElementById('gen-project-id').value || "YOUR_PROJECT_ID";
+            const bucket = document.getElementById('gen-bucket-name').value || "YOUR_BUCKET_NAME";
+            const region = document.getElementById('gen-region').value || "us-central1";
+            const hfToken = document.getElementById('gen-hf-token').value || "HF_TOKEN";
+
+            const step = stepGuides[activeGenStep];
+            const contentArea = document.getElementById('gen-step-content');
+
+            // Replace templates
+            const replaceVars = (str) => {
+                return str.replace(/{PROJECT_ID}/g, project)
+                          .replace(/{BUCKET_NAME}/g, bucket)
+                          .replace(/{REGION}/g, region)
+                          .replace(/{HF_TOKEN}/g, hfToken);
+            };
+
+            const interactiveCmd = replaceVars(step.interactive_cmd);
+            const headlessCmd = replaceVars(step.headless_cmd);
+
+            contentArea.innerHTML = `
+                <h4 style="color: var(--text-primary); font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">${step.title}</h4>
+                <div style="font-size: 0.9rem; font-style: italic; color: var(--text-muted); margin-bottom: 1rem;">${step.subtitle}</div>
+                <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Overview:</strong> ${step.purpose}</p>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--primary); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">orchestrator: <code>${step.script}</code></div>
+                
+                <div class="code-header" style="margin-bottom: 0.25rem;">
+                    <span>Interactive / Walkthrough Mode</span>
+                    <button class="copy-code-btn" onclick="copyText(this, 'interactive-code-box')">Copy</button>
+                </div>
+                <pre style="margin-top: 0 !important; margin-bottom: 1.5rem !important;"><code id="interactive-code-box" class="language-bash">${interactiveCmd}</code></pre>
+
+                <div class="code-header" style="margin-bottom: 0.25rem;">
+                    <span>Headless / CI-CD Automated Mode</span>
+                    <button class="copy-code-btn" onclick="copyText(this, 'headless-code-box')">Copy</button>
+                </div>
+                <pre style="margin-top: 0 !important; margin-bottom: 0 !important;"><code id="headless-code-box" class="language-bash">${headlessCmd}</code></pre>
+            `;
+        }
+
+        function copyText(btn, elementId) {
+            const code = document.getElementById(elementId).innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                btn.innerText = "Copied!";
+                setTimeout(() => btn.innerText = "Copy", 1500);
+            }).catch(err => {
+                btn.innerText = "Error";
+                setTimeout(() => btn.innerText = "Copy", 1500);
+            });
+        }
+
+        // Initialize on page load and hash routing
+        window.onload = function() {
+            calculateVRAM();
+            switchGenStep(0);
+            if (window.location.hash) {
+                const link = document.querySelector(`.nav-item[href="${window.location.hash}"]`);
+                if (link) {
+                    setActiveNav(null, link);
+                }
+            }
+        };
+
+        window.addEventListener('hashchange', function() {
+            if (window.location.hash) {
+                const link = document.querySelector(`.nav-item[href="${window.location.hash}"]`);
+                if (link) {
+                    setActiveNav(null, link);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

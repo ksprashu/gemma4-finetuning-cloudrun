@@ -1,0 +1,167 @@
+            <!-- INTRODUCTION -->
+            <article id="introduction" class="active-page">
+                <div class="hero-section">
+                    <span class="book-badge">The Complete Encyclopedia</span>
+                    <h1>The Gemma 4 Fine-Tuning &amp; Inference Encyclopedia</h1>
+                    <div class="subtitle">An Opinionated, Low-Hype Engineering Guide to Optimising, Serving, and Evaluating Google's Edge Multimodal Models.</div>
+                </div>
+
+                <div class="media-container">
+                    <img src="../gemma_finetuning_workflow.png" alt="Gemma 4 Fine-Tuning Pipeline Infographic" class="media-image">
+                    <div class="media-caption">Figure 0.1: Our End-to-End Multimodal Fine-Tuning and Serverless serving pipeline for Gemma 4 (Edge 4B) models.</div>
+                </div>
+
+                <h2>Why this book exists</h2>
+                <p>Let's skip the marketing slides and AI hype. In practical, boots-on-the-ground engineering, running open-weights LLMs like Google's <strong>Gemma 4 (Edge 2B / 4B)</strong> locally or on serverless infrastructure requires navigating a minefield of memory bottlenecks, precision mismatches, and fragile software integrations.</p>
+                <p>Whether you are trying to squeeze training passes onto a single free-tier 15GB VRAM T4 GPU on Colab, or scaling sub-second latency endpoints on serverless container clouds like GCP Cloud Run, this book is designed to make you an immediate expert. It compiles the rigorous theoretical foundations of model runtimes and quantisation formats, matches them with copy-pasteable implementations across major libraries, and consolidates the real-world, battle-tested solutions we engineered during our active development cycles.</p>
+
+                <h2>Beginner's Core Concept Primer</h2>
+                <p>Before diving into the low-level optimizations and architectural schematics of Gemma 4, it is essential to ground our analysis in the fundamental concepts governing modern deep learning runtimes. Below, we define and mathematically contextualize the core building blocks of large language model training and deployment:</p>
+                
+                <div class="callout" style="border-left-color: var(--primary); background-color: var(--primary-light); margin-bottom: 2rem;">
+                    <h4 style="font-weight: 700; margin-bottom: 0.5rem; color: var(--primary);">1. Video Random Access Memory (VRAM)</h4>
+                    <p style="margin-bottom: 0;"><strong>Definition:</strong> The high-speed memory residing directly on hardware accelerators (GPUs or TPUs). VRAM represents the ultimate constraint in LLM engineering. When training or serving models, VRAM is dynamically divided into several distinct pools:</p>
+                    <ul style="margin-top: 0.5rem; margin-bottom: 0;">
+                        <li><strong>Static Weights:</strong> Memory occupied by the model parameters themselves (e.g., a 4B parameter model in FP16 precision requires $4 \times 10^9 \times 2 \text{ bytes} = 8 \text{ GB}$ of static VRAM).</li>
+                        <li><strong>Optimizer States:</strong> Memory required during training (e.g., AdamW requires 8 bytes per parameter to store first and second momentum vectors).</li>
+                        <li><strong>Gradients:</strong> Crucial for weight updates, matching the weight dimension (typically 4 bytes per parameter in FP32).</li>
+                        <li><strong>Activation Memory:</strong> Intermediate layer activations stored during the forward pass to compute gradients during the backward pass.</li>
+                        <li><strong>KV Cache:</strong> Active context storage during inference to accelerate generation.</li>
+                    </ul>
+                </div>
+
+                <div class="callout" style="border-left-color: var(--accent-success); background-color: hsla(145, 65%, 50%, 0.05); margin-bottom: 2rem;">
+                    <h4 style="font-weight: 700; margin-bottom: 0.5rem; color: var(--accent-success);">2. Supervised Fine-Tuning (SFT)</h4>
+                    <p style="margin-bottom: 0;"><strong>Definition:</strong> SFT is the process of adjusting a pre-trained model's parameters on a curated dataset of instruction-response pairs. SFT uses standard cross-entropy loss computed exclusively over the target (response) tokens, masking out the prompt tokens. The loss function is formulated as:</p>
+                    <div class="math-block" style="text-align: center;">
+                        $$\mathcal{L}_{\text{SFT}} = -\sum_{i=1}^{N} \log P(y_i \mid y_{<i}, x)$$
+                    </div>
+                    <p style="margin-bottom: 0; margin-top: 0.5rem;">Where $x$ is the input instruction, $y$ is the ground-truth target sequence of length $N$, and $P(y_i \mid \cdot)$ is the probability of the token predicted by the model's language modeling head.</p>
+                </div>
+
+                <div class="callout" style="border-left-color: var(--accent-warn); background-color: hsla(32, 95%, 50%, 0.05); margin-bottom: 2rem;">
+                    <h4 style="font-weight: 700; margin-bottom: 0.5rem; color: var(--accent-warn);">3. Gradient Checkpointing (Activation Checkpointing)</h4>
+                    <p style="margin-bottom: 0;"><strong>Definition:</strong> A training technique that exchanges computational cycles for memory savings. During a standard training forward pass, PyTorch stores every intermediate activation tensor across all $L$ layers to compute the gradient chain rule during the backward pass. This causes activation memory to scale linearly $O(L)$ with model depth and sequence length.</p>
+                    <p style="margin-bottom: 0; margin-top: 0.5rem;"><strong>Mechanism:</strong> Gradient checkpointing only saves activations at a subset of layers (e.g., the boundaries of transformer blocks). When backpropagating through un-checkpointed blocks, the GPU re-executes the forward pass on-the-fly for that specific block. This reduces activation VRAM to $O(\sqrt{L})$ at the cost of approximately 30% additional compute overhead.</p>
+                </div>
+
+                <div class="callout" style="border-left-color: var(--primary); background-color: var(--primary-light); margin-bottom: 2rem;">
+                    <h4 style="font-weight: 700; margin-bottom: 0.5rem; color: var(--primary);">4. Key-Value (KV) Cache</h4>
+                    <p style="margin-bottom: 0;"><strong>Definition:</strong> An inference-time optimization designed to eliminate quadratic compute overhead. In a decoder-only transformer, generating a token at step $t$ requires computing attention over all $t-1$ historical tokens. Since historical keys ($K$) and values ($V$) do not change, recalculating them at every autoregressive step is redundant.</p>
+                    <p style="margin-bottom: 0; margin-top: 0.5rem;"><strong>Mechanism:</strong> The KV Cache stores the computed $K$ and $V$ matrices of historical tokens in VRAM. At each step, only the query vector ($Q_t$) for the single newly generated token is projected, and then multiplied directly with the cached historical key and value tensors, reducing the decoding computational complexity from $O(s^2)$ to $O(s)$ where $s$ is the active context length.</p>
+                </div>
+
+                <div class="callout" style="border-left-color: var(--accent-error); background-color: hsla(355, 75%, 50%, 0.05); margin-bottom: 2rem;">
+                    <h4 style="font-weight: 700; margin-bottom: 0.5rem; color: var(--accent-error);">5. The Basic Memory Bottleneck in Transformer Decoding</h4>
+                    <p style="margin-bottom: 0;"><strong>Definition:</strong> The fundamental performance limitation of LLM generation. While model training is **compute-bound** (leveraging massive matrix-matrix multiplications that run at maximum FLOPS on tensor cores), autoregressive decoding is strictly **memory-bandwidth bound**.</p>
+                    <p style="margin-bottom: 0; margin-top: 0.5rem;"><strong>Mechanism:</strong> To generate a single token, the GPU must fetch the entire weight matrix $W$ and the active KV cache from its high-bandwidth off-chip memory (HBM) into its on-chip SRAM registers to perform a single matrix-vector multiplication. The Arithmetic Intensity is extremely low:</p>
+                    <div class="math-block" style="text-align: center;">
+                        $$\text{Arithmetic Intensity} = \frac{\text{Floating Point Operations (FLOPs)}}{\text{Memory Access (Bytes)}} \approx 1$$
+                    </div>
+                    <p style="margin-bottom: 0; margin-top: 0.5rem;">Because modern GPUs process floating-point math orders of magnitude faster than they can read bytes from physical RAM, the tensor cores spend up to 99% of their cycles idle, waiting for weights to load. The speed of inference is thus directly governed by the memory-transfer rate, making weight quantization (e.g., compressing 16-bit weights to 4-bit) the primary mechanism for accelerating serving speeds.</p>
+                </div>
+
+                <h2>Encyclopedia Structure</h2>
+                <p>This comprehensive technical resource is organized into nine specialized chapters, mapping the lifecycle of model serving, compression, training, and evaluation:</p>
+                <ul>
+                    <li><strong>Chapter 1: Mainstream Model Runtimes &amp; Inference Engines:</strong> A deep comparison of vLLM, Hugging Face, Apple MLX, Google LiteRT, and llama.cpp.</li>
+                    <li><strong>Chapter 2: Quantisation Formats &amp; Mechanics:</strong> The mathematics of affine quantisation and the binary layout of GGUF.</li>
+                    <li><strong>Chapter 3: Fine-Tuning &amp; PEFT:</strong> Low-level adapters, including the mathematics of DoRA and validated training recipes.</li>
+                    <li><strong>Chapter 4: Robust Evaluation:</strong> Rigorous methodologies including programmatic string metrics, safety classifiers, and LLM-as-a-Judge.</li>
+                    <li><strong>Chapter 5: Our Pipeline Lessons:</strong> Architecture diagrams and lessons learned during Cloud Run serverless container deployments.</li>
+                    <li><strong>Chapter 6: Agentic Dataset Prep:</strong> How to coordinate the Google Antigravity (AGY) Producer Archetype to synthesize high-quality JSON schemas.</li>
+                    <li><strong>Chapter 7: Project Run Guide:</strong> Direct terminal orchestration guides for compiling pipelines, generating data, and deploying servers.</li>
+                    <li><strong>Chapter 8: Advanced Deep Learning Optimization:</strong> Cutting-edge model compression and serving topics including Speculative Decoding, Teacher-Student Distillation, Quantization-Aware Training (QAT), Structured/Unstructured Pruning, and multi-node Kubernetes GKE pipelines.</li>
+                    <li><strong>Chapter 9: Notebook Code Companion Guide:</strong> A granular, line-by-line and parameter-by-parameter analysis of our complete Colab fine-tuning and evaluation notebook, explaining exact variable values, available configuration options, and customization strategies.</li>
+                </ul>
+
+                <!-- INTERACTIVE VRAM ESTIMATOR WIDGET -->
+                <div class="widget-card">
+                    <div class="widget-title">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><line x1="6" y1="20" x2="6" y2="4"></line><line x1="18" y1="20" x2="18" y2="4"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+                        Interactive VRAM Footprint Estimator
+                    </div>
+                    <div class="widget-subtitle">Tweak hyperparameters and immediately see if your model will run or crash on real-world GPUs.</div>
+                    <div class="vram-grid">
+                        <div class="calc-group">
+                            <div class="form-control">
+                                <label for="operation-mode">Operation Mode</label>
+                                <select id="operation-mode" onchange="calculateVRAM()">
+                                    <option value="serving" selected>Inference / Serving Endpoint</option>
+                                    <option value="training">Fine-Tuning / Training Mode</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label for="task-type">Model Task Type</label>
+                                <select id="task-type" onchange="calculateVRAM()">
+                                    <option value="text" selected>Text-Only Generation</option>
+                                    <option value="multimodal">Multimodal Vision-Language Generation</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label for="param-size">Model Size (Parameter Count)</label>
+                                <select id="param-size" onchange="calculateVRAM()">
+                                    <option value="2.0">Gemma 4 E2B (2 Billion Dense)</option>
+                                    <option value="4.0" selected>Gemma 4 E4B (4 Billion Dense)</option>
+                                    <option value="7.0">Standard 7B Class Model</option>
+                                    <option value="9.0">Gemma 2 9B (9 Billion Dense)</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label for="weight-precision">Model Precision (Quantisation)</label>
+                                <select id="weight-precision" onchange="calculateVRAM()">
+                                    <option value="16">FP16 / BF16 (Uncompressed)</option>
+                                    <option value="8">INT8 Quantised (8-bit)</option>
+                                    <option value="4" selected>NF4 / INT4 Quantised (4-bit)</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label for="lora-rank">Fine-Tuning Adaptor Rank (LoRA r)</label>
+                                <select id="lora-rank" onchange="calculateVRAM()">
+                                    <option value="0">None (Pure Base Model Serving)</option>
+                                    <option value="8">r = 8 (Minimum Adaptor)</option>
+                                    <option value="16" selected>r = 16 (Standard QLoRA)</option>
+                                    <option value="32">r = 32 (Wide Adaptor)</option>
+                                    <option value="64">r = 64 (Dense Adaptor)</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label for="context-window">Active Context Length (tokens)</label>
+                                <select id="context-window" onchange="calculateVRAM()">
+                                    <option value="2048" selected>2,048 Tokens</option>
+                                    <option value="4096">4,096 Tokens</option>
+                                    <option value="8192">8,192 Tokens</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="vram-results">
+                            <div class="vram-gauge">
+                                <span class="gauge-value" id="vram-val">0.0</span>
+                                <span class="gauge-unit">GB VRAM</span>
+                            </div>
+                            <div class="result-details">
+                                <div class="result-row">
+                                    <span>Model Weights Memory:</span>
+                                    <strong id="w-mem">0.0 GB</strong>
+                                </div>
+                                <div class="result-row">
+                                    <span>KV Cache Footprint:</span>
+                                    <strong id="kv-mem">0.0 GB</strong>
+                                </div>
+                                <div class="result-row">
+                                    <span>LoRA Trainer Overhead:</span>
+                                    <strong id="lora-mem">0.0 GB</strong>
+                                </div>
+                                <div class="result-row">
+                                    <span>NVIDIA T4 (15GB VRAM):</span>
+                                    <span id="t4-pill" class="gpu-status-pill">OK</span>
+                                </div>
+                                <div class="result-row">
+                                    <span>NVIDIA L4 (24GB VRAM):</span>
+                                    <span id="l4-pill" class="gpu-status-pill">OK</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </article>

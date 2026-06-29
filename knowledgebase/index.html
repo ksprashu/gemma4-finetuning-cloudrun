@@ -992,6 +992,8 @@
                 </button>
             </div>
 
+            
+
             <!-- INTRODUCTION -->
             <article id="introduction" class="active-page">
                 <div class="hero-section">
@@ -1159,6 +1161,7 @@
                     </div>
                 </div>
             </article>
+
 
             <!-- CHAPTER 1: MODEL RUNTIMES -->
             <article id="chapter1">
@@ -1499,6 +1502,7 @@ int main() {
                 </div>
             </article>
 
+
             <!-- CHAPTER 2: QUANTISATION FORMATS -->
             <article id="chapter2">
                 <span class="book-badge">Chapter 2</span>
@@ -1731,6 +1735,7 @@ python3 convert_hf_to_gguf.py /path/to/gemma-2-9b-it/ \
                     <div class="quiz-feedback"></div>
                 </div>
             </article>
+
 
             <!-- CHAPTER 3: FINE-TUNING & PEFT -->
             <article id="chapter3">
@@ -2882,6 +2887,7 @@ if __name__ == "__main__":
                 </div>
             </article>
 
+
             <!-- CHAPTER 4: ROBUST EVALUATION -->
             <article id="chapter4">
                 <span class="book-badge">Chapter 4</span>
@@ -2948,6 +2954,7 @@ print(f"Token-Level F1 (Conversational leakage): {compute_token_f1('Negative<end
                 </div>
             </article>
 
+
             <!-- CHAPTER 5: FIRST-HAND LESSONS -->
             <article id="chapter5">
                 <span class="book-badge">Chapter 5</span>
@@ -3011,6 +3018,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
                 <p><strong>The Symptom:</strong> Hugging Face model access requires authentication via <code>HF_TOKEN</code>. Storing this token as a plaintext string inside source files represents a critical security risk.</p>
                 <p><strong>The Remediation:</strong> We engineered a robust Secret Manager retrieval strategy in <code>train.py</code> and <code>serve.py</code>, mounting the project environment variables to Google Secret Manager, with an in-code API resolver fallback if local environments lack local environment settings.</p>
             </article>
+
 
             <!-- CHAPTER 6: AGENTIC DATASET PREPARATION -->
             <article id="chapter6">
@@ -3136,6 +3144,7 @@ Ensure diverse realistic chat snippets with conversational natural flow, typos, 
                     </div>
                 </div>
             </article>
+
 
             <!-- CHAPTER 7: PROJECT RUN GUIDE & INTERACTIVE DEPLOYMENT BUILDER -->
             <article id="chapter7">
@@ -3503,6 +3512,7 @@ python src/evaluation_check.py</code></pre>
                 </div>
             </article>
 
+
             <article id="chapter8">
                 <span class="book-badge">Chapter 8</span>
                 <h2>Advanced Deep Learning Optimization</h2>
@@ -3760,6 +3770,7 @@ spec:
                     <div class="quiz-feedback" style="display: none;"></div>
                 </div>
             </article>
+
 
             <!-- CHAPTER 9: COLAB NOTEBOOK CODE COMPANION GUIDE -->
             <article id="chapter9">
@@ -4477,6 +4488,9 @@ for pr in test_reviews:
                     <div class="quiz-feedback" style="display: none;"></div>
                 </div>
             </article>
+
+
+
 
         </main>
     </div>

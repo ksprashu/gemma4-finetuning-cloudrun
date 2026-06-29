@@ -1,0 +1,65 @@
+            <!-- CHAPTER 4: ROBUST EVALUATION -->
+            <article id="chapter4">
+                <span class="book-badge">Chapter 4</span>
+                <h2>Robust LLM Evaluation Strategies</h2>
+                <p>Deploying specialized classification or extraction models requires moving past blind trust in token completion. Relying strictly on academic benchmarks fails to capture real-world user distributions.</p>
+
+                <h3>Programmatic Metric Mechanics</h3>
+                <p>When evaluate specialized sentiment or extraction LLMs, we measure output classes programmatically. Accuracy is highly vulnerable to imbalanced datasets (e.g. if 90% of samples are positive, a dummy model achieves 90% accuracy). Instead, we prioritize F1-score to capture precision-recall trade-offs:</p>
+                
+                <div class="math-block">
+                    $$\text{Precision} = \frac{TP}{TP + FP} \quad ; \quad \text{Recall} = \frac{TP}{TP + FN}$$
+                    $$\text{F1-Score} = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}$$
+                </div>
+
+                <h3>Robust Local Evaluation Snippet</h3>
+                <p>Traditional evaluation metrics crash when matching exact model strings due to casing differences, trailing whitespaces, or conversational token leakages. This tested, local python class evaluates model predictions cleanly:</p>
+
+                <div class="code-header"><span>Programmatic Token-Level F1 Evaluator</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import re
+
+def compute_token_f1(prediction: str, ground_truth: str) -> float:
+    """Calculates token-level F1-score to handle variations in outputs."""
+    # Custom post-processing to clean raw model strings
+    def tokenize(text):
+        cleaned = re.sub(r'[^a-zA-Z0-9\s]', '', text.lower())
+        return cleaned.split()
+    
+    pred_tokens = tokenize(prediction)
+    gt_tokens = tokenize(ground_truth)
+    
+    if not pred_tokens or not gt_tokens:
+        return 1.0 if pred_tokens == gt_tokens else 0.0
+        
+    common_tokens = set(pred_tokens) & set(gt_tokens)
+    num_same = len(common_tokens)
+    
+    if num_same == 0:
+        return 0.0
+        
+    precision = num_same / len(pred_tokens)
+    recall = num_same / len(gt_tokens)
+    f1 = 2 * (precision * recall) / (precision + recall)
+    return f1
+
+# Example verification against edge cases
+print(f"Token-Level F1 (Emoji variation): {compute_token_f1('Positive!', 'Positive 👍') :.2f}")
+print(f"Token-Level F1 (Conversational leakage): {compute_token_f1('Negative<end_of_turn>', 'Negative') :.2f}")</code></pre>
+
+                <!-- CHAPTER 4 QUIZ -->
+                <div class="quiz-container">
+                    <div class="quiz-question">Knowledge Check: Why is exact string matching (Exact Match / EM) considered a high-risk evaluation strategy for conversational generative LLMs?</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Compute resources are independent of string-matching rules.')">
+                            A) It requires active network connections to public API gateways to compute matching hashes.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Correct! Exact Match is highly fragile; minor differences in capitalization, punctuation, trailing spaces, or emoji leaks cause a score of 0, hiding correct underlying logic.')">
+                            B) It is extremely fragile to trailing white spaces, punctuation, casing, and special conversational tokens, reporting false zeros for correct predictions.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Exact match is mathematically trivial and does not exhibit statistical bias.')">
+                            C) It introduces systematic statistical biases that consistently overestimate model parameters.
+                        </div>
+                    </div>
+                    <div class="quiz-feedback"></div>
+                </div>
+            </article>

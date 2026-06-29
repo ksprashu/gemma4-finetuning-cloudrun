@@ -1,0 +1,365 @@
+            <!-- CHAPTER 7: PROJECT RUN GUIDE & INTERACTIVE DEPLOYMENT BUILDER -->
+            <article id="chapter7">
+                <span class="book-badge">Chapter 7</span>
+                <h2>Repository Operations &amp; Run Guide</h2>
+                <p>This repository provides a production-grade, serverless framework. To help developers deploy seamlessly, we compiled all of our granular Python scripts and infrastructure tools into <strong>six atomic orchestration shell scripts</strong> that support both interactive workflows and fully automated, headless CI/CD systems.</p>
+
+                <!-- SECTION: REPOSITORY ARCHITECTURE -->
+                <h3>1. Repository Layout &amp; Directory Structure</h3>
+                <p>Before launching scripts or tweaking configs, it is helpful to understand how the workspace is structured. The repository's flat, modular layout keeps infrastructure and pipeline source code cleanly isolated:</p>
+
+                <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; box-shadow: var(--shadow-sm); display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+                    <div>
+                        <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary); text-transform: uppercase; margin-bottom: 0.75rem; letter-spacing: 0.05em;">File Tree Visualization</div>
+                        <pre style="font-family: 'JetBrains Mono', monospace !important; font-size: 0.8rem !important; padding: 1rem !important; background-color: hsl(220, 25%, 6%) !important; margin: 0 !important; line-height: 1.5;"><code style="color: #38bdf8 !important;">gemma4-finetuning/
+├── <span style="color: #34d399;">requirements.txt</span>      # Shared Python dependencies
+├── <span style="color: #34d399;">README.md</span>             # Comprehensive operational guide
+├── <span style="color: #34d399;">gemma_finetuning_wf.png</span> # Pipeline infographic
+│
+├── <span style="color: #fb7185; font-weight: bold;">deploy/</span>               # GCP YAML Configurations
+│   ├── Dockerfile.serve  # FastAPI Serving container
+│   ├── Dockerfile.train  # SFT Training container
+│   ├── job.yaml          # Declarative Cloud Run Job spec
+│   └── service.yaml      # Declarative Cloud Run Service spec
+│
+├── <span style="color: #fb7185; font-weight: bold;">notebooks/</span>            # Interactive prototyping
+│   ├── create_colab_notebook.py # Jupyter notebook compiler
+│   └── gemma4_colab_finetuning.ipynb # OOM-safe playground
+│
+├── <span style="color: #fb7185; font-weight: bold;">scripts/</span>              # Orchestration Bash scripts
+│   ├── run_step1_generate_dataset.sh
+│   ├── run_step2_upload_to_gcs.sh
+│   ├── run_step3_deploy_training_job.sh
+│   ├── run_step4_run_evaluation.sh
+│   ├── run_step5_deploy_serving.sh
+│   └── run_step6_test_inference.sh
+│
+├── <span style="color: #fb7185; font-weight: bold;">src/</span>                  # Main Core Python App
+│   ├── train.py          # QLoRA backpropagation loop
+│   ├── serve.py          # FastAPI serving application
+│   ├── generate_dataset.py # Synthetic data compiler
+│   ├── evaluation_check.py # Accuracy &amp; precision verify
+│   └── test_client.py    # OpenAI-compatible test client
+│
+└── <span style="color: #fb7185; font-weight: bold;">knowledgebase/</span>        # Interactive Encyclopedia Docs
+    ├── 1_runtimes.md     # Model runtimes comparisons
+    ├── index.html        # This interactive web dashboard</code></pre>
+                    </div>
+                    <div style="display: flex; flex-direction: column; justify-content: center; gap: 0.75rem;">
+                        <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.05em;">Component Architecture</div>
+                        <ul style="margin-left: 1.25rem; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0;">
+                            <li><strong>src/</strong>: Contains the production core code. The fine-tuning logic is housed in <code>train.py</code>, while the server API resides in <code>serve.py</code>.</li>
+                            <li><strong>scripts/</strong>: Reusable wrapper scripts. They automate active credentials resolution, configure default fallbacks, and execute raw CLI setups.</li>
+                            <li><strong>deploy/</strong>: Package specifications. Houses specialized Dockerfiles and declarative configurations with custom NVIDIA L4 specs.</li>
+                            <li><strong>notebooks/</strong>: Developer-friendly sandbox. Standard ipynb environment configured with strict memory safeguards.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- SECTION: PREREQUISITES -->
+                <h3>2. Prerequisites &amp; GCP Config</h3>
+                <p>Before executing any commands, make sure you have obtained the necessary models approvals and configured your active command line terminal:</p>
+                <div class="note-box" style="background-color: var(--primary-light); border-left: 4px solid var(--primary); padding: 1.25rem; border-radius: 8px; margin: 1.5rem 0;">
+                    <ol style="margin-left: 1.5rem; font-size: 0.925rem; line-height: 1.6; color: var(--text-secondary); margin-bottom: 0;">
+                        <li><strong>Gemma 4 HF Access Approval:</strong> Submit access requests for <a href="https://huggingface.co/google/gemma-4-E4B" target="_blank">google/gemma-4-E4B (Base)</a> and <a href="https://huggingface.co/google/gemma-4-E4B-it" target="_blank">google/gemma-4-E4B-it (Instruct)</a> models.</li>
+                        <li><strong>HuggingFace Access Token:</strong> Create a read-access API credential in your HuggingFace <a href="https://huggingface.co/settings/tokens" target="_blank">Settings Portal</a>.</li>
+                        <li><strong>Active Google Cloud Project:</strong> Authenticate and establish the default project inside your active shell:
+                            <div class="code-header" style="margin-top: 0.5rem; margin-bottom: -1.5rem;"><span>Shell</span></div>
+                            <pre style="margin-top: 0 !important; margin-bottom: 0.5rem !important;"><code class="language-bash">gcloud auth login
+gcloud config set project YOUR_PROJECT_ID</code></pre>
+                        </li>
+                        <li><strong>Enable Google API Services:</strong> Enable the services required for storage, secret manager, serverless jobs, and registry:
+                            <div class="code-header" style="margin-top: 0.5rem; margin-bottom: -1.5rem;"><span>Shell</span></div>
+                            <pre style="margin-top: 0 !important; margin-bottom: 0 !important;"><code class="language-bash">gcloud services enable run.googleapis.com \
+    artifactregistry.googleapis.com \
+    secretmanager.googleapis.com \
+    storage.googleapis.com</code></pre>
+                        </li>
+                    </ol>
+                </div>
+
+                <!-- SECTION: BEHAVIORAL COMPARISON -->
+                <h3>3. Model Behavioral Comparison</h3>
+                <p>How do the model variants differ in action? The following comparison highlights how Instruction-Tuning (IT) and our custom Fine-Tuned Sentiment Adapter alter the high-entropy autocomplete behavior of the raw base model:</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 20%;">Model Variant</th>
+                            <th style="width: 25%;">Expected Alignment</th>
+                            <th style="width: 30%;">Example Output (Same Prompt)</th>
+                            <th style="width: 25%;">Linguistic Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Instruction-Tuned (IT)</strong><br><small style="color: var(--text-muted);">google/gemma-4-E4B-it</small></td>
+                            <td><strong>Task-Aligned Helper</strong><br>Responds to conversational structure and follows targeted instructions.</td>
+                            <td><code>Positive</code></td>
+                            <td>Aligned using RLHF/SFT to recognize prompt templates and output structured completions.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Base Model</strong><br><small style="color: var(--text-muted);">google/gemma-4-E4B</small></td>
+                            <td><strong>Raw Statistical Autocomplete</strong><br>Continues the sequence like a document, ignoring the instruction boundary.</td>
+                            <td><code>Classify the sentiment: 'Bad battery.'<br>Classify the sentiment: 'Slow shipping.'</code></td>
+                            <td>Operates as a pure probability model. It acts as a statistical completer, duplicating patterns rather than executing a task.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Fine-Tuned Adapter</strong><br><small style="color: var(--text-muted);">Base Model + Custom Sentiment Adapter</small></td>
+                            <td><strong>Domain-Aligned Specialist</strong><br>Restricts outputs to the targeted class tokens under a constrained schema.</td>
+                            <td><code>Positive</code></td>
+                            <td>QLoRA gradients fine-tuned the linear layers, steering logits to emit exact sentiment labels for the domain template.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- INTERACTIVE GCP COMMAND GENERATOR WIDGET -->
+                <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin: 2rem 0; box-shadow: var(--shadow-md);">
+                    <h3 style="color: var(--primary); margin-top: 0; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="color: var(--primary);"><path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                        Interactive GCP Command Generator
+                    </h3>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1.5rem;">Enter your custom Google Cloud configurations below to automatically customize every orchestration command line across the entire pipeline!</p>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                        <div class="control-group">
+                            <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">GCP Project ID</label>
+                            <input type="text" id="gen-project-id" class="search-input" value="my-enterprise-project" oninput="updateGenCommands()" style="padding-left: 0.75rem; margin-top: 0.25rem;">
+                        </div>
+                        <div class="control-group">
+                            <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">GCS Bucket Name</label>
+                            <input type="text" id="gen-bucket-name" class="search-input" value="my-gemma4-bucket" oninput="updateGenCommands()" style="padding-left: 0.75rem; margin-top: 0.25rem;">
+                        </div>
+                        <div class="control-group">
+                            <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">GCP Region</label>
+                            <input type="text" id="gen-region" class="search-input" value="us-central1" oninput="updateGenCommands()" style="padding-left: 0.75rem; margin-top: 0.25rem;">
+                        </div>
+                        <div class="control-group">
+                            <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">HuggingFace Read Token</label>
+                            <input type="text" id="gen-hf-token" class="search-input" value="hf_token_placeholder" oninput="updateGenCommands()" style="padding-left: 0.75rem; margin-top: 0.25rem;">
+                        </div>
+                    </div>
+                </div>
+
+                <h3>4. Consolidated Step-by-Step Operations Pipeline</h3>
+                <p style="margin-bottom: 1.5rem;">Follow the steps below to orchestrate the pipeline from dataset generation to inference testing and model evaluation.</p>
+
+                <!-- STEP-BY-STEP OPERATION PIPELINE ACCORDION OR CAROUSEL / NAV TABS -->
+                <div style="margin-top: 2rem; margin-bottom: 3rem;">
+                    <!-- Step navigation tabs -->
+                    <div style="display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem;">
+                        <button class="terminal-tab-btn active gen-step-tab" onclick="switchGenStep(0)">Step 1: Dataset</button>
+                        <button class="terminal-tab-btn gen-step-tab" onclick="switchGenStep(1)">Step 2: GCS Upload</button>
+                        <button class="terminal-tab-btn gen-step-tab" onclick="switchGenStep(2)">Step 3: Setup Job</button>
+                        <button class="terminal-tab-btn gen-step-tab" onclick="switchGenStep(3)">Step 4: Run FT Job</button>
+                        <button class="terminal-tab-btn gen-step-tab" onclick="switchGenStep(4)">Step 5: Deploy Serve</button>
+                        <button class="terminal-tab-btn gen-step-tab" onclick="switchGenStep(5)">Step 6: Inference</button>
+                        <button class="terminal-tab-btn gen-step-tab" onclick="switchGenStep(6)">Step 7: Evaluation</button>
+                    </div>
+
+                    <!-- Step content wrapper -->
+                    <div id="gen-step-content" class="widget-card" style="border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; background-color: var(--bg-card); box-shadow: var(--shadow-sm);">
+                        <!-- Injected dynamically -->
+                    </div>
+                </div>
+
+                <!-- SECTION: DETAILED MANUAL MANUAL UNDER-THE-HOOD COMMANDS -->
+                <h3>5. Under-the-Hood: Detailed Manual Walkthrough</h3>
+                <p>If you choose to skip the wrapper shell scripts or want to integrate individual steps into a CI/CD system, run these precise commands manually:</p>
+                
+                <div style="display: flex; flex-direction: column; gap: 2rem; margin: 2rem 0;">
+                    <!-- Manual Synthesis -->
+                    <div style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem;">
+                        <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 700; margin-bottom: 0.5rem;">A. Programmatic Dataset Synthesis (Pathway A)</h4>
+                        <p style="font-size: 0.95rem; margin-bottom: 1rem;">To compile the raw dataset locally using our programmatic generator script (generating exactly 2,000 unique sentiment records), execute:</p>
+                        <div class="code-header"><span>Shell</span></div>
+                        <pre style="margin-top: 0 !important; margin-bottom: 0 !important;"><code class="language-bash">python src/generate_dataset.py</code></pre>
+                    </div>
+
+                    <!-- Bucket creation -->
+                    <div style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem;">
+                        <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 700; margin-bottom: 0.5rem;">B. GCS Provisioning &amp; Upload</h4>
+                        <p style="font-size: 0.95rem; margin-bottom: 1rem;">Create a high-performance regional Cloud Storage bucket (using either <code>gcloud storage</code> or <code>gsutil</code>) and copy the training dataset file:</p>
+                        <div class="code-header"><span>Shell (gcloud storage - Recommended)</span></div>
+                        <pre style="margin-top: 0 !important; margin-bottom: 1rem !important;"><code class="language-bash"># Create regional storage
+gcloud storage buckets create gs://YOUR_BUCKET_NAME --location=us-central1
+
+# Copy compiled dataset
+gcloud storage cp sentiment_dataset.jsonl gs://YOUR_BUCKET_NAME/datasets/sentiment_dataset.jsonl</code></pre>
+                        <div class="code-header"><span>Shell (gsutil - Legacy Alternate)</span></div>
+                        <pre style="margin-top: 0 !important; margin-bottom: 0 !important;"><code class="language-bash">gsutil mb -l us-central1 gs://YOUR_BUCKET_NAME
+gsutil cp sentiment_dataset.jsonl gs://YOUR_BUCKET_NAME/datasets/sentiment_dataset.jsonl</code></pre>
+                    </div>
+
+                    <!-- Secret Setup & Build -->
+                    <div style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem;">
+                        <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 700; margin-bottom: 0.5rem;">C. Secrets Registry &amp; Docker Image Packaging</h4>
+                        <p style="font-size: 0.95rem; margin-bottom: 1rem;">Register the private Hugging Face token securely in GCP Secret Manager, provision an Artifact Registry repository, and build both the training and serving images locally to push them:</p>
+                        <div class="code-header"><span>Shell</span></div>
+                        <pre style="margin-top: 0 !important; margin-bottom: 0 !important;"><code class="language-bash"># 1. Store private Hugging Face token securely
+echo -n "YOUR_HF_TOKEN" | gcloud secrets create HF_TOKEN --data-file=-
+
+# 2. Setup Artifact Registry Repository in us-central1
+gcloud artifacts repositories create gemma-4-repo \
+    --repository-format=docker \
+    --location=us-central1
+
+# 3. Configure Docker credential helper
+gcloud auth configure-docker us-central1-docker.pkg.dev
+
+# 4. Build and push the QLoRA Fine-Tuning Image
+docker build -t us-central1-docker.pkg.dev/YOUR_PROJECT_ID/gemma-4-repo/gemma-4-train:latest -f deploy/Dockerfile.train .
+docker push us-central1-docker.pkg.dev/YOUR_PROJECT_ID/gemma-4-repo/gemma-4-train:latest
+
+# 5. Build and push the FastAPI Serving Image
+docker build -t us-central1-docker.pkg.dev/YOUR_PROJECT_ID/gemma-4-repo/gemma-4-serve:latest -f deploy/Dockerfile.serve .
+docker push us-central1-docker.pkg.dev/YOUR_PROJECT_ID/gemma-4-repo/gemma-4-serve:latest</code></pre>
+                    </div>
+
+                    <!-- Imperative vs Declarative FT Job -->
+                    <div style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem;">
+                        <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 700; margin-bottom: 0.5rem;">D. Cloud Run Fine-Tuning Job Execution (Serverless GPU)</h4>
+                        <p style="font-size: 0.95rem; margin-bottom: 1rem;">To configure NVIDIA L4 GPUs on serverless Cloud Run, the limits block must specify <code>nvidia.com/gpu: '1'</code>, the accelerator selected as <code>nvidia-l4</code>, and GPU zonal redundancy set to disabled (mandatory for GPU runtimes). SFT training can be deployed in two formats:</p>
+                        
+                        <div class="code-header"><span>Option A: Declarative YAML (Recommended)</span></div>
+                        <pre style="margin-top: 0 !important; margin-bottom: 1rem !important;"><code class="language-bash"># Ensure deploy/job.yaml has correct GCS bucket name &amp; project IDs, then deploy:
+envsubst &lt; deploy/job.yaml | gcloud run jobs replace -
+
+# Execute the job
+gcloud run jobs execute gemma-4-finetune --region=us-central1</code></pre>
+
+                        <div class="code-header"><span>Option B: Imperative CLI</span></div>
+                        <pre style="margin-top: 0 !important; margin-bottom: 0 !important;"><code class="language-bash">gcloud run jobs create gemma-4-finetune \
+  --image=us-central1-docker.pkg.dev/YOUR_PROJECT_ID/gemma-4-repo/gemma-4-train:latest \
+  --region=us-central1 \
+  --gpu=1 \
+  --gpu-type=nvidia-l4 \
+  --cpu=8 \
+  --memory=32Gi \
+  --no-gpu-zonal-redundancy \
+  --set-env-vars="HF_TOKEN=YOUR_HF_TOKEN" \
+  --command="python" \
+  --args="train.py,--model_id,google/gemma-4-E4B,--dataset_name_or_path,gs://YOUR_BUCKET_NAME/datasets/sentiment_dataset.jsonl,--gcs_bucket,YOUR_BUCKET_NAME,--gcs_prefix,gemma-4-adapters"</code></pre>
+                    </div>
+
+                    <!-- Serving Deploy -->
+                    <div style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem;">
+                        <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 700; margin-bottom: 0.5rem;">E. Deploy Serving with Dynamic GCS Adapter Loading</h4>
+                        <p style="font-size: 0.95rem; margin-bottom: 1rem;">When the serving container boots, it loads the base model in 4-bit quantization (consuming only ~5.5GB of the L4's 24GB VRAM) and automatically downloads and mounts your fine-tuned LoRA adapters directly from GCS. Deploy the serverless service:</p>
+                        
+                        <div class="code-header"><span>Option A: Declarative YAML (Recommended)</span></div>
+                        <pre style="margin-top: 0 !important; margin-bottom: 1rem !important;"><code class="language-bash"># Ensure deploy/service.yaml contains correct PROJECT_ID and GCS path variables, then deploy:
+envsubst &lt; deploy/service.yaml | gcloud run services replace -</code></pre>
+
+                        <div class="code-header"><span>Option B: Imperative CLI</span></div>
+                        <pre style="margin-top: 0 !important; margin-bottom: 0 !important;"><code class="language-bash">gcloud run deploy gemma-4-serve \
+  --image=us-central1-docker.pkg.dev/YOUR_PROJECT_ID/gemma-4-repo/gemma-4-serve:latest \
+  --region=us-central1 \
+  --gpu=1 \
+  --gpu-type=nvidia-l4 \
+  --cpu=8 \
+  --memory=32Gi \
+  --no-gpu-zonal-redundancy \
+  --no-cpu-throttling \
+  --min-instances=1 \
+  --set-env-vars="HF_TOKEN=YOUR_HF_TOKEN,MODEL_ID=google/gemma-4-E4B-it,LORA_ADAPTER_PATH=gs://YOUR_BUCKET_NAME/gemma-4-adapters"</code></pre>
+                    </div>
+
+                    <!-- Testing and Evaluation -->
+                    <div style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem;">
+                        <h4 style="font-size: 1.1rem; color: var(--primary); font-weight: 700; margin-bottom: 0.5rem;">F. Inference Testing &amp; Programmatic Evaluation</h4>
+                        <p style="font-size: 0.95rem; margin-bottom: 1rem;">Retrieve your serving URL (e.g. <code>https://gemma-4-serve-xxxxx.a.run.app</code>) and execute queries or run the performance evaluation:</p>
+                        
+                        <div class="code-header"><span>Querying via Python OpenAI-Compatible Client</span></div>
+                        <pre style="margin-top: 0 !important; margin-bottom: 1rem !important;"><code class="language-bash">python src/test_client.py \
+    --url "https://gemma-4-serve-xxxxx.a.run.app" \
+    --mode chat \
+    --prompt "Classify the sentiment: 'Oh brilliant, another meeting scheduled for Friday at 5 PM...'"</code></pre>
+
+                        <div class="code-header"><span>Querying via Raw Curl (OpenAI compatible)</span></div>
+                        <pre style="margin-top: 0 !important; margin-bottom: 1rem !important;"><code class="language-bash">curl -X POST "https://gemma-4-serve-xxxxx.a.run.app/v1/chat/completions" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "messages": [
+         {"role": "user", "content": "Classify the sentiment: '\''That movie missed the mark completely.'\''"}
+       ],
+       "max_new_tokens": 50,
+       "temperature": 0.1
+     }'</code></pre>
+
+                        <div class="code-header"><span>Running the Precision Audit (Evaluation Mode 1 = Remote Service, 2 = Local PyTorch)</span></div>
+                        <pre style="margin-top: 0 !important; margin-bottom: 0 !important;"><code class="language-bash"># Run remote evaluation
+export EVAL_MODE=1
+export SERVICE_URL="https://gemma-4-serve-xxxxx.a.run.app"
+python src/evaluation_check.py</code></pre>
+                    </div>
+                </div>
+
+                <!-- EXPLANATORY OPERATIONS SECTIONS -->
+                <h3>6. Orchestration Scripts Reference Manual</h3>
+                <p>The core configuration options, input environment variables, and fallback mechanisms for each built shell script are explained below:</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Script Name</th>
+                            <th>Purpose &amp; Action</th>
+                            <th>Crucial Environment Variables</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>run_step1_generate_dataset.sh</strong></td>
+                            <td>Compiles the local raw training dataset using the highly-nuanced synthetic generator.</td>
+                            <td><code>DATASET_SIZE</code> (default: 2000)<br><code>OUTPUT_FILE</code> (default: <code>sentiment_dataset.jsonl</code>)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>run_step2_upload_to_gcs.sh</strong></td>
+                            <td>Creates a high-performance regional GCS bucket and uploads the compiled training dataset.</td>
+                            <td><code>PROJECT_ID</code> (autoset via gcloud)<br><code>BUCKET_NAME</code> (autoset)<br><code>REGION</code> (default: <code>us-central1</code>)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>run_step3_deploy_training_job.sh</strong></td>
+                            <td>Enables GCP APIs, registers the read Hugging Face token securely in Secret Manager, builds the training container image, and registers the serverless GPU Cloud Run Job.</td>
+                            <td><code>PROJECT_ID</code>, <code>BUCKET_NAME</code>, <code>REGION</code>, <code>HF_TOKEN</code>, <code>REPO_NAME</code> (default: <code>gemma-4-repo</code>), <code>JOB_NAME</code> (default: <code>gemma-4-finetune</code>)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>run_step5_deploy_serving.sh</strong></td>
+                            <td>Builds the serving API container, provisions resources (L4 GPU), and deploys the model server with on-the-fly GCS adapter loading.</td>
+                            <td><code>PROJECT_ID</code>, <code>BUCKET_NAME</code>, <code>REGION</code>, <code>REPO_NAME</code>, <code>SERVICE_NAME</code> (default: <code>gemma-4-serve</code>)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>run_step6_test_inference.sh</strong></td>
+                            <td>Queries `/health`, Chat Completion OpenAI-compatible APIs, and streams metrics directly to test the live server.</td>
+                            <td><code>SERVICE_URL</code> (autoset via gcloud)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>run_step4_run_evaluation.sh</strong></td>
+                            <td>Runs the precision, token-F1 score, and accuracy evaluation check against either the remote deployed service or locally using PyTorch.</td>
+                            <td><code>EVAL_MODE</code> (1=Remote, 2=Local)<br><code>SERVICE_URL</code><br><code>ADAPTER_PATH</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="note-box" style="background-color: var(--primary-light); border-left: 4px solid var(--primary); padding: 1.5rem; border-radius: 8px; margin: 2rem 0;">
+                    <h4 style="color: var(--primary); margin-top: 0; margin-bottom: 0.75rem; font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                        🖥️ Google Colab Companion Prototyping Guide
+                    </h4>
+                    <p style="font-size: 0.95rem; line-height: 1.6; color: var(--text-secondary); margin-bottom: 1rem;">For developers who do not have immediate access to Google Cloud Run or prefer to prototype entirely in their browser, we have provided an interactive, self-contained companion notebook: <code>notebooks/gemma4_colab_finetuning.ipynb</code>. You can upload this <code>.ipynb</code> file directly to <a href="https://colab.research.google.com/" target="_blank">Google Colab</a> and run it on a free-tier <strong>NVIDIA T4 GPU</strong>.</p>
+                    
+                    <h5 style="color: var(--text-primary); font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">⚡ Critical VRAM &amp; CUDA Memory Safeguards</h5>
+                    <p style="font-size: 0.9rem; line-height: 1.5; color: var(--text-secondary); margin-bottom: 1rem;">Training and running inference for a 2B model on a 15GB VRAM T4 GPU can easily lead to Out-Of-Memory (OOM) failures. Our companion notebook implements strict memory structures:</p>
+                    <ul style="margin-left: 1.5rem; font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                        <li><strong>Programmatic VRAM Flushes:</strong> Deletes active model references and triggers Python garbage collection along with PyTorch CUDA cache empties (<code>torch.cuda.empty_cache()</code>).</li>
+                        <li><strong>IPython History Cache Clears:</strong> Standard deletion is insufficient because IPython caches execution results. Our custom cleanup code completely purges <code>sys.last_traceback</code> and flushes <code>Out.clear()</code> to release cached tensors.</li>
+                        <li><strong>Session Restart Warning:</strong> Prompts the user to restart the runtime (<code>Runtime -> Restart session</code>) right before fine-tuning, resetting active VRAM footprint to 0.0GB while keeping installed pip dependencies intact.</li>
+                        <li><strong>Optimized SFTConfig:</strong> Configures <code>gradient_checkpointing=True</code> and <code>per_device_train_batch_size=2</code> (with <code>gradient_accumulation_steps=8</code>) to maintain a robust effective batch size of 16 while minimizing peak memory.</li>
+                    </ul>
+
+                    <h5 style="color: var(--text-primary); font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem;">🛠️ Compiling or Rebuilding the Notebook</h5>
+                    <p style="font-size: 0.9rem; line-height: 1.5; color: var(--text-secondary); margin-bottom: 0.5rem;">To customize the companion notebook's text or programmatic cells, edit <code>notebooks/create_colab_notebook.py</code> and execute:</p>
+                    <div class="code-header"><span>Shell</span></div>
+                    <pre style="margin-top: 0 !important; margin-bottom: 0 !important;"><code class="language-bash">python3 notebooks/create_colab_notebook.py</code></pre>
+                </div>
+            </article>

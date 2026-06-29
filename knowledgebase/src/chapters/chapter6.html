@@ -1,0 +1,124 @@
+            <!-- CHAPTER 6: AGENTIC DATASET PREPARATION -->
+            <article id="chapter6">
+                <span class="book-badge">Chapter 6</span>
+                <h2>Agentic Dataset Synthesis &amp; Multimodal Architectures</h2>
+                
+                <h3>Multimodal Vision-Language Architecture (Gemma Vision)</h3>
+                <p>Gemma Vision models (such as Gemma 2 2B-V and Gemma 2 9B-V) extend Google’s causal language model architecture with advanced visual comprehension capabilities. Instead of treating input purely as text-only causal tokens, these models ingest interleaved text and visual inputs dynamically, aligning them in a shared semantic latent space.</p>
+                
+                <h4>1. Vision Encoder: SigLIP</h4>
+                <p>The visual frontend of the model is powered by **SigLIP (Sigmoid Language-Image Pre-training)**, typically using a Vision Transformer (ViT) variant such as <code>siglip-so400m-patch14-384</code>.</p>
+                <ul>
+                    <li><strong>Sigmoid Loss:</strong> Unlike standard CLIP which uses a softmax loss across an entire batch (coupling all examples together and requiring massive batch sizes for stabilization), SigLIP employs a pairwise sigmoid loss. This treats the image-text matching task as a collection of independent binary classification tasks, stabilizing training and scaling efficiently to arbitrary batch sizes.</li>
+                    <li><strong>Visual Tokenization:</strong> A raw image of size \(H \times W\) is split into a grid of non-overlapping patches of size \(P \times P\) (where \(P = 14\) is the patch size). For a standard input resolution of \(384 \times 384\) pixels:
+                        $$N_{\text{patches}} = \left( \frac{H}{P} \right) \times \left( \frac{W}{P} \right) = \left( \frac{384}{14} \right) \times \left( \frac{384}{14} \right) \approx 27.4 \times 27.4 \implies 729 \text{ tokens}$$
+                        These 729 visual tokens are processed by the ViT to output 729 patch embeddings, each of dimension \(d_{\text{vision}} = 1152\) (for the SO400m backbones).
+                    </li>
+                </ul>
+
+                <h4>2. Visual Patch Projection Layers</h4>
+                <p>The visual patch embeddings cannot be fed directly into the language model because their dimensionality (\(d_{\text{vision}}\)) does not match the LLM's hidden layer dimension (\(d_{\text{LLM}}\), which is \(2048\) for Gemma 2 2B or \(3584\) for Gemma 2 9B). To align the visual tokens with the textual embedding space, a <strong>Multimodal Projector</strong> is used. In Gemma 2 Vision, this is implemented as a 2-layer Multi-Layer Perceptron (MLP) with SwiGLU or GELU activation:</p>
+                <div class="math-block">
+                    $$X_{\text{projected}} = W_2 \cdot \text{Act}(W_1 \cdot H_{\text{vision}} + b_1) + b_2$$
+                    Where:
+                    <ul>
+                        <li>\(H_{\text{vision}} \in \mathbb{R}^{729 \times d_{\text{vision}}}\) is the matrix of raw vision patch embeddings.</li>
+                        <li>\(W_1 \in \mathbb{R}^{d_{\text{vision}} \times d_{\text{proj}}}\) and \(W_2 \in \mathbb{R}^{d_{\text{proj}} \times d_{\text{LLM}}}\) are learnable projection matrices (often \(d_{\text{proj}} = 4 \times d_{\text{LLM}}\)).</li>
+                        <li>\(\text{Act}\) is the activation function (e.g., GELU).</li>
+                        <li>\(X_{\text{projected}} \in \mathbb{R}^{729 \times d_{\text{LLM}}}\) is the final sequence of visual patch embeddings aligned with the text latent space.</li>
+                    </ul>
+                </div>
+
+                <h4>3. Interleaved Text and Image Representation</h4>
+                <p>Visual tokens are interleaved with text tokens dynamically in the input sequence. Special boundary tokens are wrapped around visual sequences to let the causal decoder recognize sensory boundaries:</p>
+                <div class="math-block">
+                    $$\text{Input Sequence} = \left[ \langle\text{bos}\rangle, \dots, \text{text tokens}, \langle\text{image}\rangle, v_1, v_2, \dots, v_{729}, \langle\text{/image}\rangle, \text{text tokens} \right]$$
+                </div>
+                <p>In adaptive-resolution variants (such as processing high-resolution images), the model splits a large image (e.g., \(896 \times 896\)) into multiple \(384 \times 384\) tiles plus a downscaled global thumbnail. Each tile is processed independently by SigLIP, projected, and interleaved with custom row/column delimiter tokens:</p>
+                <div class="math-block">
+                    $$N_{\text{total\_visual\_tokens}} = (N_{\text{tiles}} + 1) \times 729 + N_{\text{delimiters}}$$
+                </div>
+                <p>For a 4-tile high-resolution image, this results in over \(3,645\) visual tokens, requiring substantial KV cache capacity and VRAM allocations during serving.</p>
+
+                <h3>Agentic Dataset Synthesis with Google Antigravity (AGY)</h3>
+                <p>For high-fidelity training data that captures nuanced human communication styles, static templates fall short. Google Antigravity (AGY) offers a powerful alternative: using autonomous agents acting as a <strong>Producer Archetype</strong> to generate highly varied, schema-compliant, and diverse datasets.</p>
+
+                <div class="note-box" style="background-color: var(--primary-light); border-left: 4px solid var(--primary); padding: 1rem; border-radius: 4px; margin-bottom: 2rem;">
+                    <strong>Setup and Execution:</strong>
+                    <ul style="margin-top: 0.5rem; margin-bottom: 0;">
+                        <li><strong>Antigravity CLI:</strong> Run <code>agy</code> in your terminal.</li>
+                        <li><strong>Antigravity 2.0 (UI):</strong> Launch the Desktop Client and open your project folder to grant workspace access.</li>
+                    </ul>
+                </div>
+
+                <h3>Four Enterprise Dataset Synthesis Prompts</h3>
+                <p>These four prompts can be copied and pasted directly into AGY to generate high-value, production-grade custom datasets:</p>
+
+                <div style="display: flex; flex-direction: column; gap: 2.5rem; margin-top: 2rem;">
+                    <!-- Use Case 1 -->
+                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">1. Sarcastic Sentiment &amp; Emotion Classifier</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train a classifier to identify subtle sarcasm, double-negations, and frustrated tones.</p>
+                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
+Task: Create a synthetic fine-tuning dataset of 1000 highly varied sentiment and emotional classification samples.
+Constraints:
+- Out of these, 400 must contain subtle sarcasm, 200 mixed-sentiments, 200 double-negations, and 200 realistic typos/slang.
+- Target sentiment classes: "Positive", "Negative", "Sarcastic", "Frustrated".
+- Format: Save the output directly as a JSON Lines (.jsonl) file in my current workspace named `sentiment_dataset.jsonl`.
+- Schema: Every line must be a single JSON object matching this structure exactly:
+  {"messages": [{"role": "user", "content": "Classify the sentiment: '&lt;REVIEW_TEXT&gt;'"}, {"role": "model", "content": "&lt;LABEL&gt;"}]}
+
+Begin generating now, ensuring diverse vocabulary across sectors (food, apps, hotels, tech gadgets). Avoid repeating review structures.</code></pre>
+                    </div>
+
+                    <!-- Use Case 2 -->
+                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">2. Multilingual Support Ticket Router</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train a gatekeeper model to route customer support tickets in multiple languages to structured JSON payloads.</p>
+                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
+Task: Create a synthetic fine-tuning dataset of 1000 customer support triage samples.
+Constraints:
+- The input review should be in random languages (English, Spanish, French, German, Japanese, Hindi).
+- The model must output a JSON block indicating category and priority.
+- Target Categories: "billing", "technical_support", "account_security", "refund_request".
+- Target Priorities: "critical", "high", "medium", "low".
+- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `triage_dataset.jsonl`.
+- Schema: Every line must be a single JSON object matching this structure exactly:
+  {"messages": [{"role": "user", "content": "Triage this support ticket: '&lt;TICKET_TEXT&gt;'"}, {"role": "model", "content": "{\\\"category\\\": \\\"&lt;CAT&gt;\\\", \\\"priority\\\": \\\"&lt;PRIORITY&gt;\\\"}"}]}
+
+Begin generating now, ensuring highly realistic support scenarios (e.g. payment failure, locked out of account, api latency, pricing query).</code></pre>
+                    </div>
+
+                    <!-- Use Case 3 -->
+                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">3. Text-to-API Payload Copilot</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train a text-to-API translation engine to output schema-compliant REST API JSON function calls.</p>
+                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
+Task: Create a synthetic fine-tuning dataset of 1000 Text-to-API function call translation samples.
+Constraints:
+- The user prompt should be a natural language request to perform an action (e.g., book a flight, update a user profile, send a notification).
+- The model response should be a formatted, structured REST API payload.
+- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `api_dataset.jsonl`.
+- Schema: Every line must be a single JSON object matching this structure exactly:
+  {"messages": [{"role": "user", "content": "Translate to API payload: '&lt;REQUEST_TEXT&gt;'"}, {"role": "model", "content": "{\\\"action\\\": \\\"&lt;ACTION&gt;\\\", \\\"params\\\": {&lt;PARAMETERS&gt;}}"}]}
+
+Ensure wide variety of operations (Create, Read, Update, Delete) across CRM, booking, and notification system paradigms.</code></pre>
+                    </div>
+
+                    <!-- Use Case 4 -->
+                    <div class="widget-card" style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="color: var(--primary); margin-bottom: 0.5rem; font-size: 1.1rem; font-weight: 700;">4. Enterprise PII Redactor</h4>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;"><strong>Goal:</strong> Train Gemma to redact sensitive information (SSN, credit card, emails) from conversational chat histories.</p>
+                        <pre style="margin-top: 0.5rem !important;"><code class="language-markdown">Role: Act as a data generation engineer (Producer Archetype).
+Task: Create a synthetic fine-tuning dataset of 1000 PII anonymization samples.
+Constraints:
+- The input should be a conversational transcript containing names, credit card numbers, email addresses, phone numbers, or SSNs.
+- The model response must be the exact same transcript, but with all PII replaced by standardized tags like `[REDACTED_NAME]`, `[REDACTED_EMAIL]`, `[REDACTED_PHONE]`, `[REDACTED_CARD]`.
+- Format: Save as a JSON Lines (.jsonl) file in my current workspace named `pii_dataset.jsonl`.
+- Schema: Every line must be a single JSON object matching this structure exactly:
+  {"messages": [{"role": "user", "content": "Redact PII from this transcript: '&lt;TRANSCRIPT&gt;'"}, {"role": "model", "content": "&lt;REDACTED_TRANSCRIPT&gt;"}]}
+
+Ensure diverse realistic chat snippets with conversational natural flow, typos, and varied customer service contexts.</code></pre>
+                    </div>
+                </div>
+            </article>

@@ -1,0 +1,257 @@
+            <article id="chapter8">
+                <span class="book-badge">Chapter 8</span>
+                <h2>Advanced Deep Learning Optimization</h2>
+                <p>To deploy models like Gemma at global scale, deep learning engineers must go beyond traditional fine-tuning and basic post-training quantization. This chapter explores cutting-edge optimization methodologies: Speculative Decoding, Knowledge Distillation with temperature-scaling mathematical corrections, Quantization-Aware Training (QAT), Structured &amp; Unstructured Pruning, and multi-node Kubernetes GKE pipelines for distributed serving.</p>
+
+                <!-- SECTION 1: SPECULATIVE DECODING -->
+                <h3>1. Speculative Decoding &amp; Acceptance Sampling</h3>
+                <p>Autoregressive generation is inherently memory-bandwidth bound: each token generation requires loading the entire model's parameters (billions of bytes) into local GPU registers to perform a single forward pass. <strong>Speculative Decoding</strong> bypasses this bottleneck by utilizing a smaller, faster "draft" model (e.g., Gemma 2B) to speculate a sequence of $K$ candidate tokens, which are then validated in parallel by the larger "target" model (e.g., Gemma 9B) in a single forward pass.</p>
+
+                <h4>Mathematical Derivation of Acceptance Probability</h4>
+                <p>To guarantee that the final generated token distribution is mathematically identical to the target model's true distribution, Speculative Decoding uses a modified rejection sampling scheme. Let $p(x)$ be the target model's probability distribution for token $x$, and $q(x)$ be the draft model's probability distribution.</p>
+                <p>For each hypothesized draft token $x_i$ ($i = 1, \dots, K$), we accept it with probability:</p>
+                $$\alpha = \min\left(1, \frac{p(x_i)}{q(x_i)}\right)$$
+                <p>If a token $x_i$ is accepted, we proceed to evaluate the next token $x_{i+1}$. If a token $x_i$ is rejected, we discard all subsequent speculated tokens ($x_{i+1}, \dots, x_K$), and sample the replacement token $x_i^*$ from the adjusted residual distribution:</p>
+                $$p'(x) = \frac{\max\left(0, p(x) - q(x)\right)}{\sum_{y} \max\left(0, p(y) - q(y)\right)}$$
+                <p>This formulation ensures unbiased sampling while maximizing the expected number of accepted tokens per draft verification pass.</p>
+
+                <div class="code-header"><span>HuggingFace Speculative Decoding Implementation</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Load the target model (large and accurate)
+target_model_id = "google/gemma-2-9b-it"
+target_model = AutoModelForCausalLM.from_pretrained(
+    target_model_id,
+    torch_dtype=torch.bfloat16,
+    device_map="auto"
+)
+
+# Load the draft model (small and fast)
+draft_model_id = "google/gemma-2-2b-it"
+draft_model = AutoModelForCausalLM.from_pretrained(
+    draft_model_id,
+    torch_dtype=torch.bfloat16,
+    device_map="auto"
+)
+
+tokenizer = AutoTokenizer.from_pretrained(target_model_id)
+
+inputs = tokenizer("Advanced optimization techniques in deep learning include", return_tensors="pt").to("cuda")
+
+# Generate speculatively by setting assistant_model
+outputs = target_model.generate(
+    **inputs,
+    assistant_model=draft_model,
+    max_new_tokens=100,
+    temperature=0.7,
+    do_sample=True
+)
+
+print(tokenizer.decode(outputs[0], skip_special_tokens=True))</code></pre>
+
+                <!-- SECTION 2: KNOWLEDGE DISTILLATION -->
+                <h3>2. Dual-Loss Knowledge Distillation</h3>
+                <p>Knowledge Distillation transfers the rich linguistic "dark knowledge" of a massive "teacher" model into a lightweight "student" model. Rather than training the student purely on hard ground-truth labels, it is optimized using a dual loss function containing both the traditional Cross-Entropy loss on hard labels and a soft-label Kullback-Leibler (KL) divergence loss evaluated on temperature-scaled teacher logits.</p>
+
+                <h4>Dual-Loss Mathematical Formulation</h4>
+                <p>Let $z_S$ and $z_T$ represent the logit outputs of the student and teacher models respectively. The soft probability distributions $p_S^T$ and $p_T^T$ are computed using a scaling temperature $T$:</p>
+                $$p_S^T(x) = \frac{\exp(z_{S,x} / T)}{\sum_y \exp(z_{S,y} / T)} \quad , \quad p_T^T(x) = \frac{\exp(z_{T,x} / T)}{\sum_y \exp(z_{T,y} / T)}$$
+                <p>The total loss function is defined as:</p>
+                $$\mathcal{L}_{\text{total}} = (1 - \alpha) \mathcal{L}_{\text{CE}}(y, \text{softmax}(z_S)) + \alpha T^2 \mathcal{L}_{\text{KD}}(p_T^T, p_S^T)$$
+                <p>Where $\mathcal{L}_{\text{CE}}$ is the standard cross-entropy loss, $\mathcal{L}_{\text{KD}}$ is the KL divergence $\text{KL}(p_T^T || p_S^T)$, and $\alpha$ is a balancing hyperparameter.</p>
+
+                <div class="note-box" style="background-color: var(--primary-light); border-left: 4px solid var(--primary); padding: 1.25rem; border-radius: 8px; margin: 1.5rem 0;">
+                    <strong>The \(T^2\) Temperature-Correction Factor:</strong> When dividing logits by $T$, the corresponding gradients computed with respect to the soft loss term scale down by a factor of $1/T^2$. To prevent the soft loss gradient from being completely dominated by the hard loss gradient as $T$ increases, we multiply the soft-label loss term by $T^2$. This mathematical correction ensures stable optimization and consistent gradient magnitude balance across different temperatures.
+                </div>
+
+                <div class="code-header"><span>Custom DistillationTrainer Implementation</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import torch
+import torch.nn as nn
+from transformers import Trainer
+
+class DistillationTrainer(Trainer):
+    def __init__(self, teacher_model, alpha=0.5, temperature=2.0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.teacher_model = teacher_model
+        self.teacher_model.eval() # Ensure teacher is in evaluation mode
+        self.alpha = alpha
+        self.temperature = temperature
+        self.kl_loss_fn = nn.KLDivLoss(reduction="batchmean")
+
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        # Student forward pass
+        student_outputs = model(**inputs)
+        student_logits = student_outputs.get("logits")
+        student_loss = student_outputs.get("loss") # Hard cross-entropy loss
+
+        # Teacher forward pass (no gradients computed)
+        with torch.no_grad():
+            teacher_outputs = self.teacher_model(**inputs)
+            teacher_logits = teacher_outputs.get("logits")
+
+        # Soft temperature-scaled log-probabilities
+        soft_student = nn.functional.log_softmax(student_logits / self.temperature, dim=-1)
+        soft_teacher = nn.functional.softmax(teacher_logits / self.temperature, dim=-1)
+
+        # KL Divergence scaled by T^2 as mathematically derived
+        kd_loss = self.kl_loss_fn(soft_student, soft_teacher) * (self.temperature ** 2)
+
+        # Combined dual-loss
+        loss = (1.0 - self.alpha) * student_loss + self.alpha * kd_loss
+
+        return (loss, student_outputs) if return_outputs else loss</code></pre>
+
+                <!-- SECTION 3: QUANTIZATION-AWARE TRAINING -->
+                <h3>3. Quantization-Aware Training (QAT) vs. Post-Training Quantization (PTQ)</h3>
+                <p>Post-Training Quantization (PTQ) compiles scale factors directly from pre-trained static weights, which inevitably introduces quantization noise and error. In contrast, <strong>Quantization-Aware Training (QAT)</strong> models the quantization process in the forward pass of training, allowing the model's parameters to adapt and minimize quantization loss during backpropagation.</p>
+
+                <h4>Straight-Through Estimator (STE) Math</h4>
+                <p>Quantization functions (such as rounding or clipping) are step-wise flat functions with zero derivative almost everywhere. During backpropagation, this zero gradient would halt gradient descent (since $\frac{\partial q}{\partial w} = 0$). To bypass this, the <strong>Straight-Through Estimator (STE)</strong> replaces the true derivative of the quantization function with an identity mapping during the backward pass:</p>
+                $$\text{Forward: } q = \text{round}\left( \text{clip}\left(\frac{w}{S}, q_{\min}, q_{\max}\right) \right)$$
+                $$\text{Backward: } \frac{\partial \mathcal{L}}{\partial w} \approx \frac{\partial \mathcal{L}}{\partial q}$$
+                <p>This allows gradients to flow directly to the continuous-valued weights, which are updated using high-precision FP32 accumulators, while the weights are quantized on the fly in the forward pass.</p>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Metric / Feature</th>
+                                <th>Post-Training Quantization (PTQ)</th>
+                                <th>Quantization-Aware Training (QAT)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Accuracy Retention</strong></td>
+                                <td>Minor to severe drop (especially for smaller models &lt; 7B parameters)</td>
+                                <td>Near-perfect preservation (often matching the original baseline model)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Computational Cost</strong></td>
+                                <td>Extremely low (minutes on a single GPU or CPU)</td>
+                                <td>High (requires full training runs, massive dataset batches, and long runtimes)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Code Complexity</strong></td>
+                                <td>Very simple (one-click scripts in <code>llama.cpp</code> or <code>bitsandbytes</code>)</td>
+                                <td>High (requires modifying trainers, using custom PyTorch or TensorRT-LLM APIs)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Ideal Target Use Cases</strong></td>
+                                <td>Deploying massive pre-trained LLMs on local workstation hardware quickly</td>
+                                <td>Enterprise serving of task-specific, fine-tuned models at hyper-scale</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- SECTION 4: STRUCTURED & UNSTRUCTURED PRUNING -->
+                <h3>4. Structured vs. Unstructured Model Pruning</h3>
+                <p>Pruning removes redundant weights from a neural network to decrease size and accelerate operations. However, the geometric structure of what we prune has major implications for actual hardware inference speeds.</p>
+
+                <h4>Unstructured Pruning (Element-wise)</h4>
+                <p>Unstructured pruning removes individual weight elements based on their absolute magnitude relative to a global or layer-wise threshold $\tau$:</p>
+                $$M_{i,j} = \begin{cases} 1 &amp; \text{if } |w_{i,j}| &gt; \tau \\ 0 &amp; \text{otherwise} \end{cases}$$
+                <p>While unstructured pruning can remove up to 90% of model weights without significant accuracy loss, it introduces "holes" into the weight matrices. Standard GPUs are highly inefficient at computing sparse matrix multiplications unless they can utilize highly specialized libraries or architectures (like NVIDIA's 2:4 structured sparsity), making actual speedups difficult to achieve on standard hardware.</p>
+
+                <h4>Structured Pruning (Channel/Row-wise)</h4>
+                <p>Structured pruning removes entire rows, columns, or structural channels based on their combined row-wise $L_2$ norm magnitude:</p>
+                $$M_{i,*} = \begin{cases} 1 &amp; \text{if } \|w_{i,*}\|_2 &gt; \tau \\ 0 &amp; \text{otherwise} \end{cases}$$
+                <p>Where the row-wise $L_2$ norm is defined as:</p>
+                $$\|w_{i,*}\|_2 = \sqrt{\sum_{j} w_{i,j}^2}$$
+                <p>By removing entire rows or attention heads, structured pruning produces smaller, <strong>dense</strong> matrices. These dense matrices map perfectly to standard GPU Tensor Cores, yielding immediate, direct speedups on any hardware without needing sparse execution libraries.</p>
+
+                <!-- SECTION 5: MULTI-NODE DISTRIBUTED PIPELINES -->
+                <h3>5. Distributed GKE Serving: Tensor Parallelism vs. Pipeline Parallelism</h3>
+                <p>When models cannot fit into the memory of a single GPU, we must partition the workload across multiple GPUs or nodes. Under Kubernetes (GKE), this is orchestrated using frameworks like Ray and vLLM configured with appropriate parallelization dimensions:</p>
+                <ul>
+                    <li><strong>Tensor Parallelism (TP):</strong> Splitting individual weight matrices (like self-attention projections) across multiple GPUs. This requires intra-node high-bandwidth NVLink connections due to the heavy <code>All-Reduce</code> communications required per layer.</li>
+                    <li><strong>Pipeline Parallelism (PP):</strong> Partitioning the model's sequential layers across different GPUs or virtual machine nodes. This operates with lower communication bandwidth constraints but requires scheduling strategies (like GPipe or 1F1B) to prevent execution bubbles.</li>
+                </ul>
+
+                <div class="code-header"><span>Kubernetes GKE vLLM Deployment Manifest (Ray / TP=8, PP=2)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-yaml">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-gemma-multi-node
+  namespace: default
+  labels:
+    app: vllm-gemma
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vllm-gemma
+  template:
+    metadata:
+      labels:
+        app: vllm-gemma
+    spec:
+      containers:
+      - name: vllm-server
+        image: vllm/vllm-openai:latest
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            nvidia.com/gpu: "8"
+            cpu: "64"
+            memory: "250Gi"
+          requests:
+            nvidia.com/gpu: "8"
+            cpu: "32"
+            memory: "128Gi"
+        env:
+        - name: MODEL_ID
+          value: "google/gemma-2-9b-it"
+        - name: HUGGING_FACE_HUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-secret
+              key: token
+        ports:
+        - containerPort: 8000
+        command: ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+        args:
+        - "--model=$(MODEL_ID)"
+        - "--tensor-parallel-size=8"
+        - "--pipeline-parallel-size=2"
+        - "--gpu-memory-utilization=0.95"
+        - "--max-model-len=8192"
+        - "--port=8000"</code></pre>
+
+                <!-- CHAPTER 8 QUIZ -->
+                <div class="quiz-container">
+                    <div class="quiz-question">Knowledge Check 1: In Knowledge Distillation, why is multiplying the soft-label loss term by \(T^2\) mathematically essential?</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. High-precision calculations are not influenced by the temperature scaling multiplier.')">
+                            A) To scale up logit weights so they don't trigger floating-point underflow on low-precision FP16 hardware.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Exactly! Dividing logits by T scales down gradients by 1/(T^2). Multiplying the soft loss by T^2 offsets this effect, ensuring gradients remain balanced across different temperatures.')">
+                            B) To cancel out the 1/(T^2) scaling of soft-loss gradients caused by dividing logits by temperature T during the forward pass.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'Incorrect. The number of active classes does not determine the temperature scaling factor.')">
+                            C) To adjust student logits so they dynamically scale depending on the total class-counts in the dataset vocabulary.
+                        </div>
+                    </div>
+                    <div class="quiz-feedback" style="display: none;"></div>
+                </div>
+
+                <div class="quiz-container" style="margin-top: 2rem;">
+                    <div class="quiz-question">Knowledge Check 2: Why does Structured Pruning provide immediate hardware speedups on normal GPUs while Unstructured Pruning often fails to do so?</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Both pruning methods reduce the raw number of parameter values.')">
+                            A) Structured pruning reduces model weights while unstructured pruning only changes activation patterns.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Correct! Structured pruning removes entire contiguous blocks, keeping matrices dense and perfectly aligned with GPU Tensor Cores. Unstructured pruning leaves a sparse pattern of zeros that standard GPUs cannot compute efficiently.')">
+                            B) Structured pruning removes entire layers/rows/attention-heads to keep matrices dense. Unstructured pruning leaves sparse matrix holes that require specialized hardware or libraries.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Straight-Through Estimators (STE) are used in Quantization-Aware Training (QAT), not pruning.')">
+                            C) Structured pruning relies on the Straight-Through Estimator during backpropagation while unstructured pruning operates completely post-training.
+                        </div>
+                    </div>
+                    <div class="quiz-feedback" style="display: none;"></div>
+                </div>
+                    <div class="quiz-feedback" style="display: none;"></div>
+                </div>
+            </article>

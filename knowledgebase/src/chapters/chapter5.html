@@ -1,0 +1,63 @@
+            <!-- CHAPTER 5: FIRST-HAND LESSONS -->
+            <article id="chapter5">
+                <span class="book-badge">Chapter 5</span>
+                <h2>First-Hand Engineering Lessons from our Gemma 4 Pipeline</h2>
+                <p>During our fine-tuning and deployment session for Google's <strong>Gemma 4 (Edge 4B)</strong> model, we encountered several real-world engineering hurdles, runtime errors, and system limitations. This document chronicles those errors, the root causes we identified, and the specific architectural and code-level fixes we engineered to achieve production readiness.</p>
+
+                <h3>1. The Colab Form / SFTConfig Run Name Crash</h3>
+                <p><strong>The Symptom:</strong> When attempting to execute SFT training inside the Jupyter/Colab notebook, the training runner threw an immediate initialization exception, preventing SFTTrainer from starting.</p>
+                <p><strong>The Root Cause:</strong> A dropdown or form field in the notebook UI set the <code>run_name</code> parameter of <code>SFTConfig</code> to the literal string <code>"manual"</code>. Hugging Face's SFTConfig and Wandb integrations treat <code>"manual"</code> as a reserved system trigger, or it failed to resolve against active experiment trackers, resulting in an invalid argument type exception.</p>
+                <p><strong>The Remediation:</strong> We corrected the notebook SFT configuration inside the compiler script <code>create_colab_notebook.py</code>, changing the default form parameter from <code>"manual"</code> to <code>"none"</code> or an empty string <code>""</code>. SFTConfig now initializes perfectly, allowing Hugging Face Trainer to coordinate with background telemetry smoothly.</p>
+
+                <h3>2. Missing AutoModelForCausalLM NameError in Step 3</h3>
+                <p><strong>The Symptom:</strong> Executing the model load cell in the notebook threw a traceback: <code>NameError: name 'AutoModelForCausalLM' is not defined</code>.</p>
+                <p><strong>The Root Cause:</strong> Colab runtimes are stateless across sessions, and the environment state can easily decay. The cell loading the base model with <code>BitsAndBytesConfig</code> relied on imports declared in a previous cell. If the user ran Step 3 out of order or after a runtime timeout/reboot, the required Hugging Face classes (<code>AutoModelForCausalLM</code>, <code>AutoTokenizer</code>) were never loaded into Python's global namespace.</p>
+                <p><strong>The Remediation:</strong> We refactored the compilation code to ensure each critical step block in the notebook is completely <strong>self-contained</strong> and robust against execution ordering, adding explicit, redundant imports inside Step 3's cell block:</p>
+                <pre><code class="language-python">import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig</code></pre>
+
+                <h3>3. Hardware Incompatibility &amp; VRAM OOMs on T4 GPUs</h3>
+                <p><strong>The Symptom:</strong> Running SFT training on standard, older GPUs like the NVIDIA T4 (standard free-tier in Colab) resulted in immediate out-of-memory (OOM) failures or silent precision degradation (loss of gradients leading to <code>NaN</code> losses).</p>
+                <p><strong>The Root Causes:</strong></p>
+                <ol>
+                    <li><strong>Bfloat16 Support:</strong> The default SFT configuration requested <code>bf16=True</code>. Bfloat16 requires native hardware support (found in Ampere architectures like L4/A100 and newer). Attempting to use bfloat16 on Turing (T4) hardware causes PyTorch to fall back to unoptimized operations, resulting in immediate training loops crashing or exploding gradients.</li>
+                    <li><strong>Standard Prepare For K-Bit Training Memory Bloat:</strong> Hugging Face's default <code>prepare_model_for_kbit_training</code> upcasts the model's entire embedding layers and <code>lm_head</code> to <code>float32</code>. For Gemma models, which feature extremely large vocabularies (256,000+ tokens), this upcast bloats VRAM consumption by <strong>over 8.75 GiB</strong> on startup, instantly crashing the T4's 15GB VRAM limit.</li>
+                </ol>
+                <p><strong>The Remediation:</strong> We engineered a highly robust, dynamic hardware-aware training script in <code>train.py</code> and a custom preparation pipeline:</p>
+                <ol>
+                    <li><strong>Dynamic Precision Detection:</strong> Added a run-time check to verify if the active GPU supports bfloat16:
+                        <pre><code class="language-python">compute_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16</code></pre>
+                    </li>
+                    <li><strong>Selective Layernorm Upcasting (The 8GB VRAM Save):</strong> We bypassed the standard PEFT helper and wrote a custom <code>custom_prepare_model_for_kbit_training</code> function. This function <strong>only</strong> upcasts layernorms (<code>norm</code>, <code>ln</code>) to <code>float32</code> while keeping the embedding and projection layers frozen at lower precision.</li>
+                    <li><strong>Residual Buffer Downcasting:</strong> On FP16-only hardware (like the T4), we recursively loop through model buffers and parameters to downcast any residual bfloat16 parameters to float16, preventing gradient mismatch crashes during backward passes.
+                        <pre><code class="language-python">if compute_dtype == torch.float16:
+    for name, buf in model.named_buffers():
+        if buf.dtype == torch.bfloat16:
+            buf.data = buf.data.to(torch.float16)</code></pre>
+                    </li>
+                </ol>
+
+                <h3>4. Conversational Stop Token Leaking during Inference</h3>
+                <p><strong>The Symptom:</strong> During inference, the model output correct predictions but appended weird trailing garbage tokens and raw template markers, for example: <code>Positive&lt;end_of_turn&gt;\n&lt;</code>.</p>
+                <p><strong>The Root Cause:</strong> Gemma 4 uses specific, highly constrained multi-turn templates with structural boundaries. During short-token generation, if the generation parameters do not explicitly specify a custom list of stop tokens, the model's logits are prone to emitting the raw string representations of conversational dividers (<code>&lt;end_of_turn&gt;</code> and <code>&lt;</code>) as standard characters before terminating, which bleed into the user-facing text.</p>
+                <p><strong>The Remediation:</strong> We engineered a robust post-processing text-cleaning utility in both <code>serve.py</code> and <code>evaluation_check.py</code>:</p>
+                <pre><code class="language-python">def clean_prediction(text: str) -> str:
+    if not text:
+        return ""
+    # Cut off at the first special token marker leak
+    cleaned = text.split("<")[0]
+    return cleaned.strip()</code></pre>
+
+                <h3>5. Volatile Filesystems &amp; Serverless Adapter Serialization</h3>
+                <p><strong>The Symptom:</strong> Storing the trained adapter inside the ephemeral Cloud Run container results in immediate data loss upon job completion, since serverless environments delete container hard drives on termination.</p>
+                <p><strong>The Remediation:</strong> We designed a <strong>dynamic GCS serialization and startup injection</strong> architecture:
+                    <ol>
+                        <li><strong>Direct GCS Upload on Complete:</strong> In <code>train.py</code>, we integrated <code>google-cloud-storage</code>. As soon as the training epochs complete, the script serializes the PEFT adapter files (only 15MB-95MB) and uploads them directly to a target GCS bucket.</li>
+                        <li><strong>Dynamic Adapter Pull on Boot:</strong> In <code>serve.py</code>, the FastAPI startup handler parses <code>LORA_ADAPTER_PATH</code>. If it detects a <code>gs://</code> path, it dynamically pulls the weights from GCS into a temporary folder on container boot (taking less than 2 seconds) and merges them onto the 4-bit quantized base model.</li>
+                    </ol>
+                </p>
+
+                <h3>6. Secret Leakage &amp; Secure GCP Secret Manager Fallback</h3>
+                <p><strong>The Symptom:</strong> Hugging Face model access requires authentication via <code>HF_TOKEN</code>. Storing this token as a plaintext string inside source files represents a critical security risk.</p>
+                <p><strong>The Remediation:</strong> We engineered a robust Secret Manager retrieval strategy in <code>train.py</code> and <code>serve.py</code>, mounting the project environment variables to Google Secret Manager, with an in-code API resolver fallback if local environments lack local environment settings.</p>
+            </article>

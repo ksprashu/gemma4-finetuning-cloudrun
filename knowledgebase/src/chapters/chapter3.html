@@ -1,0 +1,1149 @@
+            <!-- CHAPTER 3: FINE-TUNING & PEFT -->
+            <article id="chapter3">
+                <span class="book-badge">Chapter 3</span>
+                <h2>Fine-Tuning &amp; Parameter-Efficient Fine-Tuning (PEFT)</h2>
+                <p>Full parameter fine-tuning is computationally prohibitive. Backpropagation requires caching gradient activation graphs--allocating up to 4x the model's static weight memory during backward passes. PEFT methods bypass this restriction by freezing the base model and training tiny, low-rank matrices.</p>
+
+                <h3>LoRA: Low-Rank Adaptation</h3>
+                <p>LoRA parameterises weight updates \(\Delta W\) by decomposing them into two low-rank matrices \(A\) and \(B\). For a target layer weight \(W_0 \in \mathbb{R}^{d \times k}\), we formulate the update:</p>
+                
+                <div class="math-block">
+                    $$W = W_0 + \Delta W = W_0 + \frac{\alpha}{r} (B \times A)$$
+                    Where \(B \in \mathbb{R}^{d \times r}\) and \(A \in \mathbb{R}^{r \times k}\), with Rank \(r \ll \min(d, k)\) and scaling factor \(\alpha\).
+                </div>
+                
+                <p>At rank \(r=16\), trainable parameter counts shrink by **99.9%** (e.g. from 4GB down to 15MB), drastically containing VRAM footprint during optimizer execution.</p>
+
+                <h3>Advanced PEFT Variants &amp; Deep-Dives</h3>
+                <p>While standard LoRA provides significant memory savings, production requirements demand even greater efficiency or stability. Below, we explore the deep mathematical and empirical frameworks of QLoRA and Weight-Decomposed Low-Rank Adaptation (DoRA):</p>
+
+                <h4>1. QLoRA: Quantised Low-Rank Adaptation</h4>
+                <p>QLoRA reduces the memory footprint of fine-tuning by quantising the frozen base model's weights to a high-density 4-bit NormalFloat (NF4) format, while keeping the low-rank adapters in 16-bit bfloat16. To stabilize backpropagation, QLoRA introduces three key innovations:</p>
+                <ul>
+                    <li><strong>NF4 (NormalFloat4) Base Dtype:</strong> An information-theoretically optimal quantisation scheme custom-tailored for normally-distributed model weights. It partitions standard normal curves into 16 discrete levels of equal probability, avoiding uniform quantization noise.</li>
+                    <li><strong>Double Quantisation (DQ):</strong> Quantises the local block scale factors \(S\) themselves from 32-bit float to 8-bit, saving an additional 0.37 GB of VRAM for an 7B model.</li>
+                    <li><strong>Paged Optimizers:</strong> Automatically spills active optimizer states (e.g., AdamW momentum buffers) to system CPU memory during peak gradient updates on long sequences, eliminating sudden Out-Of-Memory (OOM) crashes.</li>
+                </ul>
+
+                <h4>2. DoRA: Weight-Decomposed Low-Rank Adaptation</h4>
+                <p>DoRA mathematically decouples magnitude scaling from directional updates during training, mimicking the learning capacity of full parameter fine-tuning. While standard LoRA updates couple both components within a low-rank bottleneck—making it harder for the model to learn optimal weight orientations—DoRA restricts directional updates strictly to the tangent space of the unit sphere.</p>
+                <p>Any pretrained weight matrix \(W_0 \in \mathbb{R}^{d \times k}\) can be decomposed into a magnitude vector \(m_0 \in \mathbb{R}^{1 \times k}\) (the Euclidean norm of each column) and a directional matrix \(V_0 \in \mathbb{R}^{d \times k}\):</p>
+                
+                <div class="math-block">
+                    <strong>DoRA Decomposition and Adaptation Formulas:</strong>
+                    $$W_0 = m_0 \odot \frac{V_0}{\|V_0\|_c}$$
+                    
+                    $$W = m \odot \frac{V_0 + \Delta V}{\|V_0 + \Delta V\|_c} = m \odot \frac{W_0 + B A}{\|W_0 + B A\|_c}$$
+                    
+                    Where:
+                    <ul>
+                        <li>\(m \in \mathbb{R}^{1 \times k}\) is a directly learnable magnitude vector initialized as \(m_{0, j} = \|W_{0, :, j}\|_2\).</li>
+                        <li>\(V_0 \in \mathbb{R}^{d \times k}\) is the initial direction matrix (equal to \(W_0\)).</li>
+                        <li>\(\|\cdot\|_c\) denotes the column-wise vector norm operator, scaling columns by their Euclidean norm.</li>
+                        <li>\(B \in \mathbb{R}^{d \times r}\) and \(A \in \mathbb{R}^{r \times k}\) are the standard learnable low-rank adapter matrices (\(r \ll \min(d, k)\)).</li>
+                    </ul>
+                </div>
+                
+                <p>During backpropagation, the column-wise normalization operator projects gradients orthogonally, isolating direction changes to the adapters \(B\) and \(A\) and leaving magnitude changes to be optimized directly by \(m\). This improves convergence on complex instruction-following tasks.</p>
+
+                <h4>3. GaLore (Gradient Low-Rank Projection)</h4>
+                <p>Instead of restricting parameter updates directly, GaLore projects the weight gradients \(\nabla_W \mathcal{L}\) into low-rank representations during optimizer steps, slashing optimizer memory consumption by 65% while training all parameters.</p>
+
+                <h3>Standardised Hyperparameter Reference for Gemma 4</h3>
+                <p>To achieve high-quality results when fine-tuning Gemma 4 models on custom instructions or downstream tasks, training configurations must be carefully tuned. The table below outlines production-validated hyperparameters comparing standard <strong>LoRA</strong> and <strong>QLoRA</strong> configurations.</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Hyperparameter</th>
+                            <th>Standard LoRA (BF16 Base)</th>
+                            <th>QLoRA (NF4 4-bit Base)</th>
+                            <th>Empirical Technical Rationale</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Target Modules</strong></td>
+                            <td><code>q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj</code></td>
+                            <td><code>q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj</code></td>
+                            <td>Adapting all linear projection layers is crucial; restricting adapters solely to attention heads degrades model calibration and downstream reasoning performance.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Adapter Rank (\(r\))</strong></td>
+                            <td><code>16</code> or <code>32</code></td>
+                            <td><code>32</code> or <code>64</code></td>
+                            <td>QLoRA requires a higher rank to compensate for the quantization errors present in the frozen 4-bit base model weights.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>LoRA Alpha (\(\alpha\))</strong></td>
+                            <td><code>32</code></td>
+                            <td><code>128</code> (typically \(2 \times r\) or \(4 \times r\))</td>
+                            <td>Scaling coefficient. Setting \(\alpha = 2 \times r\) scales the adapter weight updates relative to the initial pretrained weights to stabilize training.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Base Weight Dtype</strong></td>
+                            <td><code>bfloat16</code> (16-bit)</td>
+                            <td><code>nf4</code> (4-bit NormalFloat)</td>
+                            <td>BF16 provides maximum accuracy; NF4 (NormalFloat4) provides high-density 4-bit compression designed for normal distributions.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Compute Dtype</strong></td>
+                            <td><code>bfloat16</code></td>
+                            <td><code>bfloat16</code></td>
+                            <td>Compute dtype must be 16-bit to avoid numerical underflow during the adapter forward/backward passes.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Learning Rate</strong></td>
+                            <td>\(1\text{e}-4 \text{ to } 2\text{e}-4\)</td>
+                            <td>\(2\text{e}-4 \text{ to } 3\text{e}-4\)</td>
+                            <td>QLoRA requires a slightly higher learning rate to aggressively steer the model parameters given the rigid, quantized base weights.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Optimizer</strong></td>
+                            <td><code>adamw_torch</code> (or <code>adamw_8bit</code>)</td>
+                            <td><code>paged_adamw_8bit</code></td>
+                            <td>QLoRA requires paged optimizers to dynamically spill active optimizer states to system RAM, preventing OOM spikes during peak gradient evaluations.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>LR Scheduler</strong></td>
+                            <td>Cosine Decay with Warmup</td>
+                            <td>Cosine Decay with Warmup</td>
+                            <td>Prevents catastrophic forgetting during initial steps and converges smoothly as learning rate decays to \(1\text{e}-5\).</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Warmup Ratio</strong></td>
+                            <td><code>0.03</code></td>
+                            <td><code>0.05</code></td>
+                            <td>Gradually scales learning rate to prevent initial high-gradient updates from destabilizing adapter initialization.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Effective Batch Size</strong></td>
+                            <td><code>64</code> or <code>128</code></td>
+                            <td><code>64</code> or <code>128</code></td>
+                            <td>Achieved via Gradient Accumulation Steps. High effective batch sizes reduce gradient variance, ensuring stable convergence.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Weight Decay</strong></td>
+                            <td><code>0.01</code></td>
+                            <td><code>0.01</code></td>
+                            <td>Applies minor L2 regularization directly on the learnable adapter matrices to prevent overfitting on small task datasets.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Gradient Clipping</strong></td>
+                            <td><code>1.0</code></td>
+                            <td><code>1.0</code></td>
+                            <td>Caps the global norm of the gradient vector to \(1.0\) to prevent gradient explosion on long sequences or outlier batches.</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Sequence Packing</strong></td>
+                            <td><code>Enabled</code></td>
+                            <td><code>Enabled</code></td>
+                            <td>Packs multiple short dialogue examples into a single sequence length (e.g. 4096) to maximize GPU packing density and accelerate training.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Framework Integration Snippets</h3>
+                <p>Implementing PEFT requires choosing the right software harness. Here are native code architectures for mainstream libraries:</p>
+
+                <div class="code-header"><span>Hugging Face TRL &amp; PEFT QLoRA Config</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">from peft import LoraConfig, get_peft_model
+from transformers import AutoModelForCausalLM
+
+peft_config = LoraConfig(
+    r=16,
+    lora_alpha=32,
+    target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
+    lora_dropout=0.05,
+    bias="none",
+    task_type="CAUSAL_LM"
+)
+
+# Apply adaptor wrap to any base model
+model = AutoModelForCausalLM.from_pretrained("google/gemma-4-e2b-it", device_map="auto")
+model = get_peft_model(model, peft_config)
+model.print_trainable_parameters()</code></pre>
+
+                <div class="code-header"><span>JAX / Flax Functional LoRA Module</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import flax.linen as nn
+import jax.numpy as jnp
+
+class FlaxLoRADense(nn.Module):
+    features: int
+    rank: int
+    alpha: float
+    
+    @nn.compact
+    def __call__(self, x):
+        # Frozen base weight matrix
+        w_frozen = self.param('w_frozen', nn.initializers.glorot_uniform(), (x.shape[-1], self.features))
+        # Active trainable LoRA projection components
+        lora_A = self.param('lora_A', nn.initializers.normal(stddev=1.0/self.rank), (x.shape[-1], self.rank))
+        lora_B = self.param('lora_B', nn.initializers.zeros, (self.rank, self.features))
+        
+        # Freezing mechanism handled via JAX optimizer filter maps
+        base_out = jnp.dot(x, w_frozen)
+        lora_out = jnp.dot(jnp.dot(x, lora_A), lora_B) * (self.alpha / self.rank)
+        return base_out + lora_out</code></pre>
+
+                <h3>Multi-GPU Distributed Scaling</h3>
+                <p>Mixed-precision training with the AdamW optimizer is the standard for training modern large language models like Gemma 4. In a standard mixed-precision training run, model memory allocation consists of several distinct states:</p>
+                <ul>
+                    <li><strong>Model Parameters (Weights):</strong> Stored in 16-bit float (FP16 or BF16) requiring \(2\Psi\) bytes, where \(\Psi\) represents the model parameter count.</li>
+                    <li><strong>Gradients:</strong> Stored in 16-bit float (FP16 or BF16) requiring \(2\Psi\) bytes.</li>
+                    <li><strong>Optimizer States:</strong> Maintained in 32-bit float (FP32) to prevent numerical instability. The AdamW optimizer tracks three primary FP32 tensors per parameter:
+                        <ol>
+                            <li><em>Master Weights Copy:</em> A high-precision copy of the parameters used to apply tiny gradient steps, requiring \(4\Psi\) bytes.</li>
+                            <li><em>Momentum (First-order moment vector, \(m_t\)):</em> Tracks moving averages of the gradients, requiring \(4\Psi\) bytes.</li>
+                            <li><em>Variance (Second-order moment vector, \(v_t\)):</em> Tracks moving averages of squared gradients, requiring \(4\Psi\) bytes.</li>
+                        </ol>
+                    </li>
+                </ul>
+                <p>This explains the exact multiplier of \(12\Psi\) bytes for FP32 states in AdamW (\(4\Psi + 4\Psi + 4\Psi = 12\Psi\) bytes). Together, the baseline VRAM memory allocated to model states (independent of activations, workspace, and KV cache) under a non-sharded mixed-precision data-parallel framework is:</p>
+
+                <div class="math-block">
+                    $$V_{\text{states, baseline}} = V_{\text{weights}} + V_{\text{gradients}} + V_{\text{optimizer}} = 2\Psi + 2\Psi + 12\Psi = 16\Psi \text{ bytes}$$
+                </div>
+
+                <p>DeepSpeed's Zero Redundancy Optimizer (ZeRO) eliminates this duplication by sharding these states across the data-parallel world of size \(N_d\) (the number of GPUs).</p>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">ZeRO Memory Layout comparison (Memory states per GPU)</h4>
+                
+                <!-- Beautiful CSS Styled Diagram for ZeRO Stages -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 2rem 0;">
+                    <div style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; box-shadow: var(--shadow-sm); border-top: 4px solid var(--accent-error);">
+                        <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">Non-Sharded Mixed Precision</strong>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Total State: <strong style="color: var(--accent-error);">16\(\Psi\)</strong> bytes/GPU</div>
+                        <ul style="font-size: 0.8rem; margin-left: 1rem; padding: 0; list-style-type: square; color: var(--text-secondary);">
+                            <li>Weights: 2\(\Psi\) (Replicated)</li>
+                            <li>Gradients: 2\(\Psi\) (Replicated)</li>
+                            <li>AdamW States: 12\(\Psi\) (Replicated)</li>
+                        </ul>
+                    </div>
+                    <div style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; box-shadow: var(--shadow-sm); border-top: 4px solid var(--accent-warn);">
+                        <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">ZeRO-1: Optimizer Sharding</strong>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Total State: <strong>4\(\Psi\) + 12\(\Psi\)/\(N_d\)</strong></div>
+                        <ul style="font-size: 0.8rem; margin-left: 1rem; padding: 0; list-style-type: square; color: var(--text-secondary);">
+                            <li>Weights: 2\(\Psi\) (Replicated)</li>
+                            <li>Gradients: 2\(\Psi\) (Replicated)</li>
+                            <li>AdamW States: 12\(\Psi\)/\(N_d\) (Sharded)</li>
+                        </ul>
+                    </div>
+                    <div style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; box-shadow: var(--shadow-sm); border-top: 4px solid var(--primary);">
+                        <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">ZeRO-2: Gradient Sharding</strong>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Total State: <strong>2\(\Psi\) + 14\(\Psi\)/\(N_d\)</strong></div>
+                        <ul style="font-size: 0.8rem; margin-left: 1rem; padding: 0; list-style-type: square; color: var(--text-secondary);">
+                            <li>Weights: 2\(\Psi\) (Replicated)</li>
+                            <li>Gradients: 2\(\Psi\)/\(N_d\) (Sharded)</li>
+                            <li>AdamW States: 12\(\Psi\)/\(N_d\) (Sharded)</li>
+                        </ul>
+                    </div>
+                    <div style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; box-shadow: var(--shadow-sm); border-top: 4px solid var(--accent-success);">
+                        <strong style="color: var(--text-primary); display: block; margin-bottom: 0.5rem;">ZeRO-3: Parameter Sharding</strong>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Total State: <strong>16\(\Psi\)/\(N_d\) + \(V_{\text{buffer}}\)</strong></div>
+                        <ul style="font-size: 0.8rem; margin-left: 1rem; padding: 0; list-style-type: square; color: var(--text-secondary);">
+                            <li>Weights: 2\(\Psi\)/\(N_d\) (Sharded)</li>
+                            <li>Gradients: 2\(\Psi\)/\(N_d\) (Sharded)</li>
+                            <li>AdamW States: 12\(\Psi\)/\(N_d\) (Sharded)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="code-header"><span>ZeRO-1, ZeRO-2 &amp; ZeRO-3 Memory Layout (ASCII Grid)</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-bash">Non-Sharded: [Weights (2Ψ)] [Gradients (2Ψ)] [AdamW (12Ψ)] ----------> 16Ψ / GPU (Replicated)
+
+ZeRO-1:      [Weights (2Ψ)] [Gradients (2Ψ)] [AdamW (12Ψ / Nd)] ------> 4Ψ + 12Ψ/Nd (AdamW Sharded)
+
+ZeRO-2:      [Weights (2Ψ)] [Gradients (2Ψ/Nd)] [AdamW (12Ψ/Nd)] ----> 2Ψ + 14Ψ/Nd (Grads + AdamW Sharded)
+
+ZeRO-3:      [Weights (2Ψ/Nd)] [Gradients (2Ψ/Nd)] [AdamW (12Ψ/Nd)] --> 16Ψ/Nd (All states Sharded)</code></pre>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">ZeRO-1: Optimizer State Sharding</h4>
+                <p>In ZeRO-1, only the optimizer states are sharded across the \(N_d\) processes. Parameters and gradients remain replicated on each device. Each GPU updates only its designated shard of the optimizer states and applies updates to its slice of the master weights, which are then broadcasted back.</p>
+                <div class="math-block">
+                    $$V_{\text{states, ZeRO-1}} = 2\Psi + 2\Psi + \frac{12\Psi}{N_d} = 4\Psi + \frac{12\Psi}{N_d} \text{ bytes}$$
+                </div>
+                <p><strong>Scaling Behavior:</strong> As \(N_d \to \infty\), the state memory asymptotically approaches \(4\Psi\) bytes (the weight and gradient replication baseline).</p>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">ZeRO-2: Gradient Sharding</h4>
+                <p>In ZeRO-2, both the optimizer states and gradients are sharded across the \(N_d\) processes. During the backward pass, gradients are reduced and sharded immediately as they are computed layer-by-layer (via reduce-scatter), meaning a single GPU only retains the gradient shard (\(\frac{2\Psi}{N_d}\) bytes) associated with its portion of the optimizer states.</p>
+                <div class="math-block">
+                    $$V_{\text{states, ZeRO-2}} = 2\Psi + \frac{2\Psi}{N_d} + \frac{12\Psi}{N_d} = 2\Psi + \frac{14\Psi}{N_d} \text{ bytes}$$
+                </div>
+                <p><strong>Scaling Behavior:</strong> As \(N_d \to \infty\), state memory approaches \(2\Psi\) bytes (the replicated weight baseline).</p>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">ZeRO-3: Parameter Sharding</h4>
+                <p>In ZeRO-3, all three components (weights, gradients, and optimizer states) are sharded across the \(N_d\) processes. During the forward pass, layer weights are gathered (via all-gather) dynamically, computed, and immediately discarded. During the backward pass, weights are gathered again to compute activation gradients, and computed gradients are immediately reduced and partitioned.</p>
+                <div class="math-block">
+                    $$V_{\text{states, ZeRO-3}} = \frac{2\Psi}{N_d} + \frac{2\Psi}{N_d} + \frac{12\Psi}{N_d} + V_{\text{buffer}} = \frac{16\Psi}{N_d} + V_{\text{buffer}} \text{ bytes}$$
+                </div>
+                <p>where \(V_{\text{buffer}}\) represents the temporary storage for gathered parameters and gradients of the largest active layer during computation:</p>
+                <div class="math-block">
+                    $$V_{\text{buffer}} = 2\Psi_{\text{layer}} + \text{communication buffers}$$
+                </div>
+                <p>Since \(\Psi_{\text{layer}} \ll \Psi\), ZeRO-3 scales memory down linearly with \(N_d\), enabling models of arbitrary sizes to be trained on large clusters.</p>
+
+                <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">DeepSpeed Production Configurations</h4>
+                
+                <details style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; cursor: pointer; transition: var(--transition);">
+                    <summary style="font-weight: 600; color: var(--primary); outline: none;">📘 View DeepSpeed ZeRO-2 Production Configuration (ds_config_zero2.json)</summary>
+                    <div style="cursor: default; margin-top: 1rem;">
+                        <p style="font-size: 0.9rem; margin-bottom: 1rem;">Ideal when the model fits within the aggregate memory of the GPU cluster but optimizer states cause single-GPU OOMs. Includes CPU offloading for optimizer states.</p>
+                        <div class="code-header"><span>ds_config_zero2.json</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                        <pre><code class="language-json">{
+  "train_batch_size": "auto",
+  "train_micro_batch_size_per_gpu": "auto",
+  "gradient_accumulation_steps": "auto",
+  "zero_optimization": {
+    "stage": 2,
+    "offload_optimizer": {
+      "device": "cpu",
+      "pin_memory": true,
+      "buffer_count": 4,
+      "fast_init": false
+    },
+    "allgather_partitions": true,
+    "allgather_bucket_size": 2e8,
+    "overlap_comm": true,
+    "reduce_scatter": true,
+    "reduce_bucket_size": 2e8,
+    "contiguous_gradients": true
+  },
+  "bf16": {
+    "enabled": true
+  },
+  "gradient_clipping": "auto",
+  "steps_per_print": 100,
+  "wall_clock_breakdown": false
+}</code></pre>
+                    </div>
+                </details>
+
+                <details style="background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; cursor: pointer; transition: var(--transition);">
+                    <summary style="font-weight: 600; color: var(--primary); outline: none;">📕 View DeepSpeed ZeRO-3 Production Configuration (ds_config_zero3.json)</summary>
+                    <div style="cursor: default; margin-top: 1rem;">
+                        <p style="font-size: 0.9rem; margin-bottom: 1rem;">Tailored for models exceeding single-GPU memory capacity. Shards parameters, gradients, and optimizer states, offloads both weights and optimizer states to CPU/system memory, and configures aggressive communication overlapping.</p>
+                        <div class="code-header"><span>ds_config_zero3.json</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                        <pre><code class="language-json">{
+  "train_batch_size": "auto",
+  "train_micro_batch_size_per_gpu": "auto",
+  "gradient_accumulation_steps": "auto",
+  "zero_optimization": {
+    "stage": 3,
+    "offload_optimizer": {
+      "device": "cpu",
+      "pin_memory": true,
+      "buffer_count": 4,
+      "fast_init": false
+    },
+    "offload_param": {
+      "device": "cpu",
+      "pin_memory": true,
+      "buffer_count": 5,
+      "max_in_cpu": 1e9,
+      "fast_init": true
+    },
+    "allgather_partitions": true,
+    "allgather_bucket_size": 5e7,
+    "overlap_comm": true,
+    "reduce_scatter": true,
+    "reduce_bucket_size": 5e7,
+    "contiguous_gradients": true,
+    "stage3_max_live_parameters": 1e9,
+    "stage3_max_reuse_distance": 1e9,
+    "stage3_prefetch_bucket_size": 5e7,
+    "stage3_param_persistence_threshold": 1e5,
+    "stage3_gather_16bit_weights_on_model_save": true
+  },
+  "bf16": {
+    "enabled": true
+  },
+  "gradient_clipping": "auto",
+  "steps_per_print": 100,
+  "wall_clock_breakdown": false
+}</code></pre>
+                    </div>
+                </details>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">PyTorch FSDP (Fully Sharded Data Parallel) Mechanics</h4>
+                <p>PyTorch FSDP acts as an alternative to DeepSpeed ZeRO-3 by breaking parameters, gradients, and optimizer states across data-parallel ranks.</p>
+                <p><strong>FSDP State Dict Types: Sharded vs. Consolidated Checkpoints</strong></p>
+                <p>When running multi-GPU distributed training under FSDP, saving the checkpoint naively using a consolidated state dict triggers major memory bottlenecks:</p>
+                <ol style="margin-bottom: 1.5rem;">
+                    <li><strong><code>StateDictType.FULL_STATE_DICT</code> (Consolidated Checkpoints):</strong>
+                        <ul>
+                            <li><em>Mechanism:</em> Every worker rank sends its local sharded parameters to Rank 0 (the master rank). Rank 0 gathers these shards in host (CPU) memory, fits them together into a complete model state dictionary, and serializes it to disk as a single <code>.pt</code> file.</li>
+                            <li><em>Bottleneck:</em> This requires Rank 0 to have enough host memory to hold the entire un-sharded model weights (plus the communication overhead of the gather). For ultra-large models (e.g. Gemma 4 27B), compiling the full model on Rank 0 causes an instant system Out-Of-Memory (OOM) crash on both Rank 0's CPU and GPU.</li>
+                        </ul>
+                    </li>
+                    <li><strong><code>StateDictType.SHARDED_STATE_DICT</code> (Distributed Saving):</strong>
+                        <ul>
+                            <li><em>Mechanism:</em> Each process saves its local slice of the model parameters directly to a shared file system (like an NFS, Lustre, or local disk mounts) in parallel. FSDP leverages PyTorch's distributed checkpointing API (<code>torch.distributed.checkpoint</code> or <code>dist_cp</code>) to write metadata alongside a directory of multiple partitioned tensor files.</li>
+                            <li><em>Benefits:</em> Extremely scalable. It features a \(O(1)\) memory overhead with respect to cluster scaling, bypasses the bottlenecks on Rank 0, and writes checkpoints at peak disk write bandwidth speeds because all nodes write concurrently.</li>
+                        </ul>
+                    </li>
+                </ol>
+
+                <div class="code-header"><span>Production-Grade PyTorch FSDP Saving/Loading</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import os
+import torch
+import torch.nn as nn
+import torch.distributed as dist
+import torch.distributed.checkpoint as dist_cp
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import StateDictType, ShardedStateDictConfig
+
+def setup_distributed():
+    """Initializes the PyTorch distributed environment."""
+    dist.init_process_group(backend="nccl")
+    local_rank = int(os.environ["LOCAL_RANK"])
+    torch.cuda.set_device(local_rank)
+    return local_rank
+
+def cleanup_distributed():
+    """Cleans up the distributed process group."""
+    dist.destroy_process_group()
+
+class SimpleGemmaBlock(nn.Module):
+    """A mock representation of a Gemma layer block."""
+    def __init__(self, dim: int = 4096):
+        super().__init__()
+        self.ln1 = nn.LayerNorm(dim)
+        self.qkv = nn.Linear(dim, dim * 3, bias=False)
+        self.out_proj = nn.Linear(dim, dim, bias=False)
+        self.ln2 = nn.LayerNorm(dim)
+        self.mlp = nn.Sequential(
+            nn.Linear(dim, dim * 4, bias=False),
+            nn.GELU(),
+            nn.Linear(dim * 4, dim, bias=False)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h = x + self.out_proj(self.qkv(self.ln1(x)).chunk(3, dim=-1)[0])
+        return h + self.mlp(self.ln2(h))
+
+def save_fsdp_sharded_checkpoint(model: FSDP, checkpoint_dir: str):
+    """
+    Saves an FSDP model using StateDictType.SHARDED_STATE_DICT.
+    Each GPU rank writes its own shard to disk concurrently.
+    """
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    
+    # Configure FSDP to return sharded state dictionaries
+    sharded_config = ShardedStateDictConfig(offload_to_cpu=True)
+    with FSDP.state_dict_type(model, StateDictType.SHARDED_STATE_DICT, sharded_config):
+        state_dict = model.state_dict()
+    
+    # Write the sharded state dict to disk using PyTorch distributed checkpointing
+    dist_cp.save(
+        state_dict=state_dict,
+        storage_writer=dist_cp.FileSystemWriter(checkpoint_dir)
+    )
+    if dist.get_rank() == 0:
+        print(f"[SUCCESS] Sharded checkpoint successfully saved to: {checkpoint_dir}")
+
+def load_fsdp_sharded_checkpoint(model: FSDP, checkpoint_dir: str):
+    """
+    Loads an FSDP model checkpoint saved with StateDictType.SHARDED_STATE_DICT.
+    Parameters are distributed in parallel across ranks.
+    """
+    # Configure FSDP state dict type to SHARDED_STATE_DICT to align with the loader
+    sharded_config = ShardedStateDictConfig(offload_to_cpu=True)
+    with FSDP.state_dict_type(model, StateDictType.SHARDED_STATE_DICT, sharded_config):
+        state_dict = model.state_dict()
+        
+        # In-place loading directly into the distributed shards
+        dist_cp.load(
+            state_dict=state_dict,
+            storage_reader=dist_cp.FileSystemReader(checkpoint_dir)
+        )
+        
+        # Load the updated state dict back into FSDP
+        model.load_state_dict(state_dict)
+        
+    if dist.get_rank() == 0:
+        print(f"[SUCCESS] Sharded checkpoint successfully loaded from: {checkpoint_dir}")
+
+# Operational Demo
+if __name__ == "__main__":
+    # Ensure this script is run via: torchrun --nproc_per_node=X script.py
+    try:
+        rank = setup_distributed()
+        
+        # Instantiate a raw module
+        raw_model = SimpleGemmaBlock(dim=2048).cuda(rank)
+        
+        # Wrap module in FSDP sharding
+        fsdp_model = FSDP(raw_model)
+        
+        # Define checkpoint directory
+        ckpt_path = "./fsdp_sharded_gemma_checkpoint"
+        
+        # Save distributed checkpoint
+        save_fsdp_sharded_checkpoint(fsdp_model, ckpt_path)
+        
+        # Synchronize barrier
+        dist.barrier()
+        
+        # Load distributed checkpoint
+        load_fsdp_sharded_checkpoint(fsdp_model, ckpt_path)
+        
+    except KeyError:
+        print("[ERROR] Please execute this script within a torchrun / distributed shell.")
+    finally:
+        if dist.is_initialized():
+            cleanup_distributed()</code></pre>
+
+                <h3>TPU/JAX Google Hardware Scaling</h3>
+                <p>JAX implements multi-host distributed scaling using Single Program, Multiple Data (SPMD) paradigms. Rather than relying on explicit communication calls (like <code>all_reduce</code>), JAX relies on compile-time arrays sharding specifications mapped over logical hardware layouts.</p>
+                
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">Hardware Topology Mapping with <code>Mesh</code></h4>
+                <p>Physical TPU environments are connected via high-speed, multi-dimensional Torus interconnects (ICI). JAX maps these physical devices into a logical, multi-dimensional grid called a <code>Mesh</code>.</p>
+                <div class="code-header"><span>JAX Mesh Initialization</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import jax
+from jax.sharding import Mesh
+from jax.sharding import PartitionSpec as P
+
+# Get available physical devices (e.g., 8 TPU cores on a v4-8)
+devices = jax.devices()
+
+# Define a 2D Logical Mesh: 4-way Data Parallel (DP) and 2-way Tensor Parallel (TP)
+mesh = Mesh(devices.reshape(4, 2), axis_names=('data_parallel', 'tensor_parallel'))</code></pre>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">Axis Mapping via <code>PartitionSpec</code></h4>
+                <p>To shard a multidimensional array (tensor) across the logical <code>Mesh</code>, JAX uses a <code>PartitionSpec</code> (abbreviated as <code>P</code>). Each axis of the array is mapped to a named axis of the <code>Mesh</code>:</p>
+                <ul style="margin-bottom: 1.5rem;">
+                    <li><code>P('data_parallel', 'tensor_parallel')</code>: Shards the 1st axis of the array across <code>data_parallel</code> and the 2nd axis across <code>tensor_parallel</code>.</li>
+                    <li><code>P('data_parallel', None)</code>: Shards the 1st axis across <code>data_parallel</code> and leaves the 2nd axis un-sharded (replicated).</li>
+                    <li><code>P(None, None)</code>: Replicates the entire tensor across all devices.</li>
+                </ul>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">Enforcing Execution with <code>NamedSharding</code></h4>
+                <p>A <code>NamedSharding</code> object binds the logical <code>Mesh</code> and the <code>PartitionSpec</code> together:</p>
+                <div class="code-header"><span>JAX NamedSharding Binding</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">from jax.sharding import NamedSharding
+
+weight_spec = P(None, 'tensor_parallel')
+weight_sharding = NamedSharding(mesh, weight_spec)
+# Any JAX Array created with or bound to weight_sharding will be physically split 
+# along its column dimension across TPU cores mapped to 'tensor_parallel'.</code></pre>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">Distributed JAX Training Step for Gemma</h4>
+                <p>This implementation writes a complete SPMD distributed training step for Gemma. It uses JAX's modern functional layout APIs (<code>jax.jit</code> compiled with input/output <code>NamedSharding</code> objects) to trigger automatic compiler-driven multi-host TPU communication.</p>
+
+                <div class="code-header"><span>Complete JAX TPU SPMD Training Script</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import jax
+import jax.numpy as jnp
+import optax
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from typing import NamedTuple, Tuple
+
+# 1. Define Model State & Dummy Gemma Layer
+class TrainState(NamedTuple):
+    params: dict
+    opt_state: optax.OptState
+    step: jax.Array
+
+def init_dummy_gemma_params(rng, d_model=2048) -> dict:
+    k1, k2 = jax.random.split(rng)
+    # MLP projection matrices
+    return {
+        "wi": jax.random.normal(k1, (d_model, d_model * 4)) * 0.02,
+        "wo": jax.random.normal(k2, (d_model * 4, d_model)) * 0.02,
+    }
+
+def gemma_mlp_forward(params: dict, x: jax.Array) -> jax.Array:
+    """Standard swiglu-like forward pass helper."""
+    h = jnp.matmul(x, params["wi"])
+    h = jax.nn.gelu(h)
+    return jnp.matmul(h, params["wo"])
+
+# 2. Define SPMD Distributed Step Function
+def train_step(state: TrainState, batch: dict) -> Tuple[TrainState, jax.Array]:
+    """Computes grads and updates model state in a functional JAX manner."""
+    inputs, targets = batch["inputs"], batch["targets"]
+    
+    def loss_fn(params):
+        predictions = gemma_mlp_forward(params, inputs)
+        loss = jnp.mean((predictions - targets) ** 2)
+        return loss
+    
+    loss, grads = jax.value_and_grad(loss_fn)(state.params)
+    
+    # Construct optax SGD optimizer step
+    tx = optax.sgd(learning_rate=1e-3)
+    updates, new_opt_state = tx.update(grads, state.opt_state, state.params)
+    new_params = optax.apply_updates(state.params, updates)
+    
+    new_state = TrainState(
+        params=new_params,
+        opt_state=new_opt_state,
+        step=state.step + 1
+    )
+    return new_state, loss
+
+# 3. Distributed Setup and JIT Compiler Compilation
+def run_distributed_training():
+    # Setup Logical Mesh
+    devices = jax.devices()
+    num_devices = len(devices)
+    
+    # Assume 1D layout for simplicity: DP across all devices
+    mesh = Mesh(devices, axis_names=('data_parallel',))
+    
+    # Define Sharding Specs
+    dp_sharding = NamedSharding(mesh, P('data_parallel', None))
+    replicated_sharding = NamedSharding(mesh, P(None, None))
+    param_sharding = NamedSharding(mesh, P(None, None)) # Params replicated for standard DP
+    
+    # Build TrainState
+    rng = jax.random.PRNGKey(42)
+    params = init_dummy_gemma_params(rng)
+    tx = optax.sgd(learning_rate=1e-3)
+    opt_state = tx.init(params)
+    
+    state = TrainState(
+        params=params,
+        opt_state=opt_state,
+        step=jnp.array(0, dtype=jnp.int32)
+    )
+    
+    # Compile step utilizing jax.jit with precise in_shardings & out_shardings rules
+    compiled_train_step = jax.jit(
+        train_step,
+        in_shardings=(
+            # TrainState Sharding
+            TrainState(
+                params=param_sharding,      # Replicated parameters
+                opt_state=replicated_sharding, # Replicated optimizer state
+                step=replicated_sharding    # Replicated step count
+            ),
+            # Batch Sharding (Data Parallel)
+            {
+                "inputs": dp_sharding,      # inputs split along batch dimension
+                "targets": dp_sharding      # targets split along batch dimension
+            }
+        ),
+        out_shardings=(
+            # Return State Sharding
+            TrainState(
+                params=param_sharding,
+                opt_state=replicated_sharding,
+                step=replicated_sharding
+            ),
+            # Return Loss Sharding (Scalar, Replicated)
+            replicated_sharding
+        )
+    )
+    
+    # Create Dummy Batch
+    x_data = jnp.ones((num_devices * 4, 2048)) # Fits standard DP division
+    y_data = jnp.ones((num_devices * 4, 2048))
+    batch = {"inputs": x_data, "targets": y_data}
+    
+    # Execute JIT training step
+    state, loss = compiled_train_step(state, batch)
+    print(f"[SUCCESS] Distributed training iteration completed. Loss: {loss}")
+
+if __name__ == "__main__":
+    run_distributed_training()</code></pre>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">EasyLM Configuration Setups for JAX TPU Training</h4>
+                <p>EasyLM (UC Berkeley) implements robust configurations using standard <code>ml_collections</code> parameter objects. Below is a production-grade, highly-detailed implementation configuration capturing actual multi-node TPU and data-parallel sharding specifications for the Gemma model.</p>
+                <div class="code-header"><span>EasyLM Configuration Code</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">from ml_collections import ConfigDict
+
+def get_gemma_easylm_config() -> ConfigDict:
+    """Returns a highly-optimized EasyLM JAX TPU configuration for Gemma training."""
+    config = ConfigDict()
+    
+    # 1. Distributed Mesh Sharding Setup
+    # "dp=-1,fq=1,mp=1" tells EasyLM to partition the devices such that:
+    # - Model/Tensor Parallelism (mp) = 1 (replicated)
+    # - Fully Sharded Data Parallel / ZeRO-3 (fq) = 1 (replicated)
+    # - Data Parallelism (dp) = -1 (occupies all remaining physical hardware devices)
+    config.mesh_dim = "dp=-1,fq=1,mp=1"
+    
+    # 2. Model Architecture Definitions (Gemma-specific hyperparameters)
+    config.model = ConfigDict()
+    config.model.model_type = "gemma"
+    config.model.vocab_size = 256000
+    config.model.hidden_size = 2048
+    config.model.intermediate_size = 16384 # GQA / SwiGLU expansion scale
+    config.model.num_hidden_layers = 18
+    config.model.num_attention_heads = 8
+    config.model.num_key_value_heads = 1   # Grouped-Query Attention (GQA) config
+    config.model.head_dim = 256
+    config.model.max_sequence_length = 8192
+    config.model.rms_norm_eps = 1e-6
+    config.model.initializer_range = 0.02
+    config.model.use_cache = False
+    
+    # 3. Optimizer Configuration (AdamW with Warmup Cosine Decays)
+    config.optimizer = ConfigDict()
+    config.optimizer.type = "adamw"
+    config.optimizer.adamw = ConfigDict()
+    config.optimizer.adamw.weight_decay = 0.01
+    config.optimizer.adamw.beta1 = 0.9
+    config.optimizer.adamw.beta2 = 0.95
+    config.optimizer.adamw.eps = 1e-8
+    
+    # Learning rate scheduler parameters
+    config.optimizer.lr = 1e-4
+    config.optimizer.lr_warmup_steps = 1000
+    config.optimizer.lr_decay_steps = 50000
+    config.optimizer.lr_min = 1e-5
+    
+    # 4. Dataset Loading and Execution Settings
+    config.dataset = ConfigDict()
+    config.dataset.type = "huggingface"
+    config.dataset.text_processor = ConfigDict()
+    config.dataset.text_processor.dataset_name = "argilla/ultrafeedback-binarized-preferences-cleaned"
+    config.dataset.text_processor.dataset_split = "train"
+    config.dataset.text_processor.tokenizer_name = "google/gemma-2b"
+    config.dataset.text_processor.max_len = 8192
+    config.dataset.text_processor.batch_size = 64 # Global batch size distributed across TPU hosts
+    
+    # 5. Checkpointing Parameters
+    config.save_checkpoint_freq = 500
+    config.checkpoint_dir = "gs://gemma-tpu-training-bucket/checkpoints/"
+    config.load_checkpoint_path = "" # Set to resume training
+    
+    # 6. Activation Checkpointing (reduces activation footprint on HBM)
+    config.activation_checkpointing = "gemma_block"
+    
+    return config
+
+# Print layout representation for validation
+if __name__ == "__main__":
+    cfg = get_gemma_easylm_config()
+    print(f"EasyLM Gemma configuration loaded successfully.")
+    print(f"Mesh dimension string: '{cfg.mesh_dim}'")
+    print(f"Model vocab size set to: {cfg.model.vocab_size}")</code></pre>
+
+                <h3>Post-Training Model Merging</h3>
+                <p>Rather than fine-tuning a model for multiple disparate tasks, model merging allows developers to mathematically combine the weight matrices of different task-specific models into a single base model.</p>
+                
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">SLERP (Spherical Linear Interpolation)</h4>
+                <p>When combining weight tensors in a high-dimensional space, standard linear interpolation (\(\text{LERP}(W_1, W_2; t) = (1-t)W_1 + tW_2\)) breaks down. The weights of deep neural networks reside on curved high-dimensional manifolds (hyperspheres). Moving linearly between two points cuts across the sphere, reducing the norm of the intermediate weights (known as the <em>demagnetization</em> or <em>shrinkage</em> effect), which degrades performance. SLERP resolves this by interpolating along the spherical arc, keeping the norm constant.</p>
+                
+                <p>Given two weight vectors (or flattened matrices) \(W_1\) and \(W_2\), the angle \(\theta\) between them is calculated as:</p>
+                <div class="math-block">
+                    $$\theta = \arccos \left( \frac{\langle W_1, W_2 \rangle}{\|W_1\|_2 \|W_2\|_2} \right)$$
+                </div>
+                <p>where \(\langle \cdot, \cdot \rangle\) represents the inner product and \(\|\cdot\|_2\) represents the \(L_2\) norm. The SLERP equation for interpolation parameter \(t \in [0, 1]\) is:</p>
+                <div class="math-block">
+                    $$\text{SLERP}(W_1, W_2; t) = \frac{\sin((1-t)\theta)}{\sin\theta} W_1 + \frac{\sin(t\theta)}{\sin\theta} W_2$$
+                </div>
+                <p>If the tensors are collinear (\(\sin\theta \approx 0\)), SLERP falls back to LERP to prevent division by zero.</p>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">TIES (Trimming, Electing, and Merging)</h4>
+                <p>TIES addresses the issue of <em>parameter interference</em>, where weights from different fine-tuned models pull in opposite directions, canceling out useful features. It merges models in three steps:</p>
+                <p>Let \(W_{\text{base}}\) be the base model, and \(W_k\) (\(k=1, \dots, K\)) be the fine-tuned task-specific models. The update vector (or task vector) is: \(\tau_k = W_k - W_{\text{base}}\).</p>
+                <ol style="margin-bottom: 1.5rem;">
+                    <li><strong>Trimming:</strong> Many parameter changes during fine-tuning are small noise. TIES prunes the bottom \(p\%\) (by absolute magnitude) of task vector updates to zero, keeping only the top \((100-p)\%\) most significant elements. Let \(\hat{\tau}_k\) be the trimmed task vector.</li>
+                    <li><strong>Electing (Sign Consensus):</strong> Fine-tuned models may push a parameter in opposite directions (+ vs. -). TIES resolves this by finding a dominant sign consensus. For each parameter index \(j\), it calculates:
+                        <div class="math-block">
+                            $$s_j^* = \text{sgn} \left( \sum_{k=1}^K \hat{\tau}_{k, j} \right)$$
+                        </div>
+                    </li>
+                    <li><strong>Merging:</strong> TIES averages only the updates that agree with the dominant sign \(s_j^*\). Updates that disagree are dropped. Let \(A_j\) be the set of models whose update matches the consensus: \(A_j = \{k \mid \text{sgn}(\hat{\tau}_{k, j}) = s_j^*\}\). The merged task vector \(\tau_{\text{merged}}\) at index \(j\) is the average of these aligned updates:
+                        <div class="math-block">
+                            $$\tau_{\text{merged}, j} = \frac{1}{|A_j|} \sum_{k \in A_j} \hat{\tau}_{k, j}$$
+                        </div>
+                        The final merged model weights are computed as:
+                        <div class="math-block">
+                            $$W_{\text{merged}} = W_{\text{base}} + \lambda \tau_{\text{merged}}$$
+                        </div>
+                        where \(\lambda\) is a global scaling factor.
+                    </li>
+                </ol>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">DARE (Drop and Rescale)</h4>
+                <p>DARE is a probabilistic approach that prunes fine-tuned task vectors while preserving the overall parameter distribution. It randomly drops updates and rescales the remaining ones to keep the expected value of the updates unbiased.</p>
+                <p>Given a task vector \(\tau_{k, j} = W_{k, j} - W_{\text{base}, j}\), and a drop rate \(p \in [0, 1]\):</p>
+                <ol style="margin-bottom: 1.5rem;">
+                    <li><strong>Drop and Rescale:</strong> Each element of the task vector is modified as:
+                        <div class="math-block">
+                            $$\hat{\tau}_{k, j} = \begin{cases} 0 & \text{with probability } p \\ \frac{\tau_{k, j}}{1-p} & \text{with probability } 1-p \end{cases}$$
+                        </div>
+                    </li>
+                    <li><strong>Unbiased Expectation:</strong> The division by \(1-p\) is critical. It ensures the expected value of the pruned update is mathematically identical to the original unpruned update:
+                        <div class="math-block">
+                            $$\mathbb{E}[\hat{\tau}_{k, j}] = 0 \cdot p + \left(\frac{\tau_{k, j}}{1-p}\right) \cdot (1-p) = \tau_{k, j}$$
+                        </div>
+                        This allows DARE to prune up to 90%+ of parameter updates without degrading performance. The rescaled updates are then merged using standard linear averaging or TIES.
+                    </li>
+                </ol>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">Production-Ready <code>mergekit</code> Configuration</h4>
+                <p>Below is a production-ready configuration file for <code>mergekit</code>, demonstrating SLERP, TIES, and DARE merge methods using Gemma 2B variants.</p>
+                <div class="code-header"><span>mergekit_production_config.yaml</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-yaml"># mergekit_production_config.yaml
+# Production multi-model merge for Gemma-2B variants.
+
+# Global merge configuration keys
+base_model: google/gemma-2b
+dtype: bfloat16
+merge_method: dare_ties # Highly robust model combination pipeline using DARE-TIES
+
+# List of target models to merge
+models:
+  - model: google/gemma-2b
+    # The base model acts as the anchor point for task vector computation
+  - model: princeton-nlp/gemma-2b-sft
+    parameters:
+      weight: 0.5
+      density: 0.6  # Corresponds to a 40% pruning drop rate (p=0.4) under DARE
+  - model: vblagoje/gemma-2b-it
+    parameters:
+      weight: 0.5
+      density: 0.6  # Drop rate of 40% (rescales remaining parameters by 1 / 0.6 = 1.66)
+
+# Configuration parameters for the TIES/DARE election mechanics
+parameters:
+  normalize: true
+  intp_values: true # Smooths parameter updates during consolidation
+  ties:
+    # Resolves sign consensus conflicts
+    consensus_scaling: true
+
+# Fine-grained layer-by-layer SLERP merge overrides
+# We use SLERP for self-attention projections to preserve high-dimensional geometry,
+# while using DARE-TIES for MLP layers.
+slices:
+  - targets:
+      - [self_attn.q_proj, self_attn.k_proj, self_attn.v_proj]
+    merge_method: slerp
+    base_model: google/gemma-2b
+    models:
+      - model: princeton-nlp/gemma-2b-sft
+        parameters:
+          weight: 0.4
+      - model: vblagoje/gemma-2b-it
+        parameters:
+          weight: 0.6
+
+# Destination configuration output directory
+output_directory: ./merged_gemma_2b_dare_ties_slerp</code></pre>
+
+                <h3>Preference Alignment (RLHF)</h3>
+                <p>Standard RLHF pipelines require training a reference model, a reward model, and a policy model using PPO (Proximal Policy Optimization). DPO bypasses this complexity by showing that the policy model can act as its own reward model, optimizing preferences in a single closed-form loss step.</p>
+                
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">DPO Derivation from the Bradley-Terry Preference Model</h4>
+                <ol style="margin-bottom: 1.5rem;">
+                    <li><strong>Bradley-Terry (BT) Preference Model:</strong>
+                        Given a prompt \(x\), the probability that a user prefers response \(y_w\) (winning) over \(y_l\) (losing) is modeled using a latent reward function \(r(x, y)\):
+                        <div class="math-block">
+                            $$P(y_w \succ y_l \mid x) = \sigma(r(x, y_w) - r(x, y_l))$$
+                        </div>
+                        where \(\sigma(z) = \frac{1}{1 + e^{-z}}\) is the logistic sigmoid.
+                    </li>
+                    <li><strong>Standard RLHF Objective:</strong>
+                        The objective is to maximize reward while penalizing divergence from the reference policy \(\pi_{\text{ref}}\) using KL divergence:
+                        <div class="math-block">
+                            $$\max_{\pi_\theta} \mathbb{E}_{(x, y) \sim \pi_\theta}[r(x, y)] - \beta \mathbb{D}_{\text{KL}}(\pi_\theta(y \mid x) \parallel \pi_{\text{ref}}(y \mid x))$$
+                        </div>
+                        Using constrained optimization, the exact analytical solution for the optimal policy \(\pi^*\) is:
+                        <div class="math-block">
+                            $$\pi^*(y \mid x) = \frac{1}{Z(x)} \pi_{\text{ref}}(y \mid x) \exp\left( \frac{r(x, y)}{\beta} \right)$$
+                        </div>
+                        where \(Z(x) = \sum_y \pi_{\text{ref}}(y \mid x) \exp\left( \frac{r(x, y)}{\beta} \right)\) is the partition function (normalization constant).
+                    </li>
+                    <li><strong>Expressing Reward in Terms of Policy:</strong>
+                        Rearranging the optimal policy equation, we can express the latent reward \(r(x, y)\) purely in terms of policy probabilities:
+                        <div class="math-block">
+                            $$\exp\left( \frac{r(x, y)}{\beta} \right) = Z(x) \frac{\pi^*(y \mid x)}{\pi_{\text{ref}}(y \mid x)}$$
+                        </div>
+                        Taking the natural logarithm of both sides and multiplying by \(\beta\):
+                        <div class="math-block">
+                            $$r(x, y) = \beta \log \frac{\pi^*(y \mid x)}{\pi_{\text{ref}}(y \mid x)} + \beta \log Z(x)$$
+                        </div>
+                    </li>
+                    <li><strong>Canceling the Partition Function:</strong>
+                        Now, substitute this expression for \(r(x, y)\) back into the Bradley-Terry model to find the difference in rewards between \(y_w\) and \(y_l\):
+                        <div class="math-block">
+                            $$r(x, y_w) - r(x, y_l) = \left( \beta \log \frac{\pi^*(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} + \beta \log Z(x) \right) - \left( \beta \log \frac{\pi^*(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)} + \beta \log Z(x) \right)$$
+                        </div>
+                        The partition function term \(\beta \log Z(x)\) is independent of \(y\) and completely cancels out:
+                        <div class="math-block">
+                            $$r(x, y_w) - r(x, y_l) = \beta \log \frac{\pi^*(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} - \beta \log \frac{\pi^*(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)}$$
+                        </div>
+                    </li>
+                    <li><strong>DPO Loss Function:</strong>
+                        By substituting this reward difference back into the Bradley-Terry objective, the preference probability can be written using only the policy \(\pi_\theta\) and reference model \(\pi_{\text{ref}}\). To train the model, we minimize the negative log-likelihood of the preferred choices over the dataset \(\mathcal{D}\):
+                        <div class="math-block">
+                            $$\mathcal{L}_{\text{DPO}}(\pi_\theta; \pi_{\text{ref}}) = -\mathbb{E}_{(x, y_w, y_l) \sim \mathcal{D}} \left[ \log \sigma \left( \beta \log \frac{\pi_\theta(y_w \mid x)}{\pi_{\text{ref}}(y_w \mid x)} - \beta \log \frac{\pi_\theta(y_l \mid x)}{\pi_{\text{ref}}(y_l \mid x)} \right) \right]$$
+                        </div>
+                        This proves that we can optimize for human preferences in a single step, bypassing reinforcement learning completely.
+                    </li>
+                </ol>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">ORPO (Odds Ratio Preference Optimization)</h4>
+                <p>ORPO combines Supervised Fine-Tuning (SFT) and preference alignment into a single loss function. This eliminates the need to load a reference model \(\pi_{\text{ref}}\), saving up to <strong>50% of GPU VRAM</strong> during preference alignment.</p>
+                <p>ORPO uses the <em>odds ratio</em> of generating the preferred response \(y_w\) versus the dispreferred response \(y_l\). The odds of a response are:</p>
+                <div class="math-block">
+                    $$\text{odds}_\theta(y \mid x) = \frac{\pi_\theta(y \mid x)}{1 - \pi_\theta(y \mid x)}$$
+                </div>
+                <p>The ORPO loss is the sum of the standard SFT loss (on the preferred responses) and an odds ratio penalty:</p>
+                <div class="math-block">
+                    $$\mathcal{L}_{\text{ORPO}}(\theta) = \mathcal{L}_{\text{SFT}}(\theta) + \alpha \cdot \mathcal{L}_{\text{OR}}(\theta)$$
+                </div>
+                <p>where:</p>
+                <div class="math-block">
+                    $$\mathcal{L}_{\text{SFT}}(\theta) = -\frac{1}{N} \sum_{i=1}^N \log \pi_\theta(y_{w, i} \mid y_{w, <i}, x)$$
+                </div>
+                <div class="math-block">
+                    $$\mathcal{L}_{\text{OR}}(\theta) = -\log \sigma \left( \log \left( \frac{\text{odds}_\theta(y_w \mid x)}{\text{odds}_\theta(y_l \mid x)} \right) \right) = -\log \sigma \left( \log \frac{\pi_\theta(y_w \mid x) (1 - \pi_\theta(y_l \mid x))}{\pi_\theta(y_l \mid x) (1 - \pi_\theta(y_w \mid x))} \right)$$
+                </div>
+                <p>By adding this penalty, ORPO discourages the model from generating dispreferred responses while keeping the SFT update stable.</p>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">KTO (Kahneman-Tversky Optimization)</h4>
+                <p>Unlike DPO and ORPO, which require paired data \((y_w, y_l)\), KTO aligns models using <strong>unpaired binary feedback</strong> (individual prompts labeled as either "good" or "bad", \(z \in \{+1, -1\}\)). This is based on Daniel Kahneman and Amos Tversky's <em>Prospect Theory</em>, which describes how humans make decisions under risk relative to a reference point (loss aversion).</p>
+                <p>The KTO loss is:</p>
+                <div class="math-block">
+                    $$\mathcal{L}_{\text{KTO}}(\pi_\theta; \pi_{\text{ref}}) = \mathcal{L}_{\text{KTO}, +}(\pi_\theta; \pi_{\text{ref}}) + \mathcal{L}_{\text{KTO}, -}(\pi_\theta; \pi_{\text{ref}})$$
+                </div>
+                <p>where the positive and negative loss components are:</p>
+                <div class="math-block">
+                    $$\mathcal{L}_{\text{KTO}, +} = -\mathbb{E}_{(x, y) \sim \mathcal{D}_+} \left[ \lambda_+ \log \sigma \left( \beta \log \frac{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)} - z_{\text{ref}} \right) \right]$$
+                </div>
+                <div class="math-block">
+                    $$\mathcal{L}_{\text{KTO}, -} = -\mathbb{E}_{(x, y) \sim \mathcal{D}_-} \left[ \lambda_- \log \sigma \left( z_{\text{ref}} - \beta \log \frac{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)} \right) \right]$$
+                </div>
+                <p>Key parameters:</p>
+                <ul style="margin-bottom: 1.5rem;">
+                    <li><strong>Implicit Reward:</strong> \(\hat{r}_\theta(x, y) = \beta \log \frac{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)}\).</li>
+                    <li><strong>Reference Point (\(z_{\text{ref}}\)):</strong> A running average of the implicit rewards over the training batches, representing the model's current generation quality:
+                        <div class="math-block">
+                            $$z_{\text{ref}} = \mathbb{E}_{(x, y) \sim \mathcal{D}} \left[ \beta \log \frac{\pi_\theta(y \mid x)}{\pi_{\text{ref}}(y \mid x)} \right]$$
+                        </div>
+                    </li>
+                    <li><strong>Loss Aversion Coefficients (\(\lambda_+\), \(\lambda_-\)):</strong> Humans are naturally more sensitive to losses than gains. To model this, KTO sets \(\lambda_- > \lambda_+\) (typically \(\lambda_+ = 1.0, \lambda_- = 1.33\)), penalizing poor responses more heavily than rewarding good ones.</li>
+                </ul>
+
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">Production-Ready PyTorch Preference Alignment Script (TRL)</h4>
+                <p>This script implements a complete preference alignment pipeline for Gemma 4. It loads the model in 4-bit precision (QLoRA) to optimize memory usage, sets up the reference model, and runs preference alignment using Hugging Face's <code>TRL</code> library.</p>
+                
+                <div class="code-header"><span>Gemma 4 DPO/ORPO Preference Alignment Script</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">#!/usr/bin/env python3
+"""
+Production-Grade Gemma 4 DPO/ORPO Preference Alignment Training Script.
+This script implements memory-efficient QLoRA alignment using the HF TRL library.
+"""
+
+import os
+import torch
+from dataclasses import dataclass, field
+from typing import Optional
+from datasets import load_dataset
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    HfArgumentParser,
+    TrainingArguments,
+)
+from trl import DPOTrainer, ORPOTrainer, ORPOConfig, DPOConfig
+
+@dataclass
+class ScriptArguments:
+    """Hyperparameters and configuration arguments for the alignment run."""
+    model_name: str = field(
+        default="google/gemma-2b-it",
+        metadata={"help": "The path or Hugging Face Hub ID of the base SFT model."}
+    )
+    dataset_name: str = field(
+        default="argilla/ultrafeedback-binarized-preferences-cleaned",
+        metadata={"help": "The dataset to load for preference training."}
+    )
+    alignment_method: str = field(
+        default="orpo",
+        metadata={"help": "The alignment algorithm to use. Options: ['dpo', 'orpo']"}
+    )
+    learning_rate: float = field(
+        default=5e-6,
+        metadata={"help": "Learning rate for the adapter weights."}
+    )
+    beta: float = field(
+        default=0.1,
+        metadata={"help": "Beta parameter for preference scaling."}
+    )
+    max_seq_length: int = field(
+        default=2048,
+        metadata={"help": "Maximum token sequence length."}
+    )
+    output_dir: str = field(
+        default="./gemma_aligned_output",
+        metadata={"help": "Directory to save the trained adapter checkpoints."}
+    )
+
+def prepare_quantization_config() -> BitsAndBytesConfig:
+    """Configures double-quantization NF4 parameters for memory-efficient training."""
+    return BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_use_double_quant=True,
+    )
+
+def main():
+    # 1. Parse Arguments
+    parser = HfArgumentParser(ScriptArguments)
+    script_args = parser.parse_args_into_dataclasses()[0]
+    print(f"[START] Initiating {script_args.alignment_method.upper()} alignment for {script_args.model_name}")
+
+    # 2. Load Tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(script_args.model_name)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    # Gemma tokenizer alignment requirements
+    tokenizer.padding_side = "left"
+
+    # 3. Load Dataset and Format
+    # UltraFeedback binarized dataset contains columns: 'prompt', 'chosen', 'rejected'
+    dataset = load_dataset(script_args.dataset_name, split="train[:5000]") # Subset for validation
+    
+    def process_preference_data(example):
+        """Converts preference pairs into format required by DPOTrainer/ORPOTrainer."""
+        # Chosen response formatting
+        chosen_messages = [
+            {"role": "user", "content": example["prompt"]},
+            {"role": "assistant", "content": example["chosen"]}
+        ]
+        # Rejected response formatting
+        rejected_messages = [
+            {"role": "user", "content": example["prompt"]},
+            {"role": "assistant", "content": example["rejected"]}
+        ]
+        return {
+            "prompt": example["prompt"],
+            "chosen": tokenizer.apply_chat_template(chosen_messages, tokenize=False),
+            "rejected": tokenizer.apply_chat_template(rejected_messages, tokenize=False),
+        }
+
+    formatted_dataset = dataset.map(
+        process_preference_data,
+        remove_columns=dataset.column_names,
+        desc="Applying chat template and mapping preferences"
+    )
+
+    # 4. Load Base Model in 4-bit
+    bnb_config = prepare_quantization_config()
+    model = AutoModelForCausalLM.from_pretrained(
+        script_args.model_name,
+        quantization_config=bnb_config,
+        device_map="auto",
+        torch_dtype=torch.bfloat16,
+    )
+    model = prepare_model_for_kbit_training(model)
+
+    # 5. PEFT / LoRA Configuration
+    lora_config = LoraConfig(
+        r=16,
+        lora_alpha=32,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM",
+    )
+
+    # 6. Initialize Trainer based on the Selected Method
+    if script_args.alignment_method.lower() == "orpo":
+        # ORPO does not load a reference model, saving VRAM
+        training_args = ORPOConfig(
+            output_dir=script_args.output_dir,
+            learning_rate=script_args.learning_rate,
+            lr_scheduler_type="cosine",
+            per_device_train_batch_size=2,
+            gradient_accumulation_steps=4,
+            beta=script_args.beta, # Beta regulates the Odds Ratio penalty weight in ORPO
+            max_length=script_args.max_seq_length,
+            max_prompt_length=script_args.max_seq_length // 2,
+            logging_steps=10,
+            save_strategy="steps",
+            save_steps=100,
+            evaluation_strategy="no",
+            bf16=True,
+            optim="paged_adamw_8bit",
+            remove_unused_columns=False,
+        )
+        
+        trainer = ORPOTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=formatted_dataset,
+            tokenizer=tokenizer,
+            peft_config=lora_config,
+        )
+        
+    elif script_args.alignment_method.lower() == "dpo":
+        # DPO requires loading a reference model
+        # We load a second copy of the model in 4-bit for reference comparison
+        ref_model = AutoModelForCausalLM.from_pretrained(
+            script_args.model_name,
+            quantization_config=bnb_config,
+            device_map="auto",
+            torch_dtype=torch.bfloat16,
+        )
+        ref_model.eval()
+
+        training_args = DPOConfig(
+            output_dir=script_args.output_dir,
+            learning_rate=script_args.learning_rate,
+            lr_scheduler_type="cosine",
+            per_device_train_batch_size=2,
+            gradient_accumulation_steps=4,
+            beta=script_args.beta, # Beta regulates implicit reward scaling in DPO
+            max_length=script_args.max_seq_length,
+            max_prompt_length=script_args.max_seq_length // 2,
+            logging_steps=10,
+            save_strategy="steps",
+            save_steps=100,
+            evaluation_strategy="no",
+            bf16=True,
+            optim="paged_adamw_8bit",
+            remove_unused_columns=False,
+        )
+        
+        trainer = DPOTrainer(
+            model=model,
+            ref_model=ref_model,
+            args=training_args,
+            train_dataset=formatted_dataset,
+            tokenizer=tokenizer,
+            peft_config=lora_config,
+        )
+    else:
+        raise ValueError(f"Unknown alignment method: {script_args.alignment_method}")
+
+    # 7. Start Preference Alignment
+    print("[RUNNING] Training preference alignment adapter...")
+    trainer.train()
+
+    # 8. Save Final Trained Adapter
+    print(f"[SUCCESS] Saving trained preference adapter to: {script_args.output_dir}")
+    trainer.model.save_pretrained(script_args.output_dir)
+    tokenizer.save_pretrained(script_args.output_dir)
+
+if __name__ == "__main__":
+    main()</code></pre>
+
+                <!-- CHAPTER 3 QUIZ -->
+                <div class="quiz-container">
+                    <div class="quiz-question">Knowledge Check: In LoRA math, if a dense projection layer has hidden dimension \(d=4096\), what is the compression ratio of trainable elements for rank \(r=16\)?</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Perfect mathematical calculation! Normal layer updates require 16.7M elements. LoRA decomposes this into two 16x4096 grids, representing exactly 131K weights, yielding an elegant 128x compression ratio.')">
+                            A) 128x Compression (Reducing trainable weights from 16.77 million parameters to 131,072)
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Think about multiplying matrices of shapes (4096 x 16) and (16 x 4096).')">
+                            B) 4x Compression (Reducing trainable weights from 16.77 million parameters to 4.19 million)
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No, that would represent an incorrect scaling logic.')">
+                            C) 10x Compression (Reducing trainable weights to 1.67 million)
+                        </div>
+                    </div>
+                    <div class="quiz-feedback"></div>
+                </div>
+            </article>

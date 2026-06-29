@@ -1,0 +1,716 @@
+            <!-- CHAPTER 9: COLAB NOTEBOOK CODE COMPANION GUIDE -->
+            <article id="chapter9">
+                <div class="hero-section">
+                    <span class="book-badge">Chapter 9</span>
+                    <h1>Google Colab Notebook: Code Companion Guide</h1>
+                    <div class="subtitle">An Exhaustive Line-by-Line and Parameter-by-Parameter Technical Analysis of the QLoRA Fine-Tuning, Quantisation, and Evaluation Pipeline.</div>
+                </div>
+
+                <p>To master model fine-tuning, you must go beyond executing black-box cells. You must understand the computational cost, engineering tradeoffs, and physical mechanism of every line of code. This companion guide breaks down the complete Google Colab fine-tuning and evaluation notebook (<code>gemma4_colab_finetuning.ipynb</code>) in granular, line-by-line and parameter-by-parameter detail, illustrating available options and customization paths.</p>
+
+                <!-- SECTION 1 -->
+                <h2>1. Setup, Package Installations &amp; Environment Preparation</h2>
+                <p>The notebook begins by establishing a self-contained runtime environment on Google Colab's ephemeral VM. We install our core training dependencies and authenticate against the Hugging Face Hub.</p>
+
+                <div class="code-header"><span>Cell 2: Dependency Installations</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">!pip install -q -U transformers peft trl bitsandbytes accelerate datasets google-cloud-storage</code></pre>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Package Name</th>
+                                <th>Core Role in Pipeline</th>
+                                <th>Engineering Significance &amp; Hidden Mechanics</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>transformers</code></td>
+                                <td>Model Core &amp; Tokenizer</td>
+                                <td>Maintained by Hugging Face. Provides standardized model architectures, pre-trained weights loader, Tokenizers, and causal text generation algorithms.</td>
+                            </tr>
+                            <tr>
+                                <td><code>peft</code></td>
+                                <td>Parameter-Efficient Fine-Tuning</td>
+                                <td>Implements lightweight adapters (LoRA, DoRA, IA3). Freezes base layers and maps model inputs to low-rank trainable weight matrices.</td>
+                            </tr>
+                            <tr>
+                                <td><code>trl</code></td>
+                                <td>Transformer RL &amp; SFT Trainer</td>
+                                <td>Provides high-level training wrappers like <code>SFTTrainer</code> (Supervised Fine-Tuning) and <code>DPOTrainer</code>, simplifying sequence packing, loss logging, and dataset mapping.</td>
+                            </tr>
+                            <tr>
+                                <td><code>bitsandbytes</code></td>
+                                <td>CUDA Quantization &amp; Optimizers</td>
+                                <td>Maintains custom CUDA kernels that enable 4-bit/8-bit weight representation (NormalFloat4) and memory-efficient optimizers (Paged AdamW).</td>
+                            </tr>
+                            <tr>
+                                <td><code>accelerate</code></td>
+                                <td>Hardware Orchestration</td>
+                                <td>Handles multi-GPU, TPU, and CPU-offloaded memory mapping, automating <code>device_map="auto"</code> sharding logic.</td>
+                            </tr>
+                            <tr>
+                                <td><code>datasets</code></td>
+                                <td>Memory-Mapped Data Loader</td>
+                                <td>Loads data into memory-mapped Apache Arrow format tables, enabling lazy loading of massive datasets without exhausting Colab's host RAM.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="code-header"><span>Cell 3: Headless Hugging Face Authentication</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import os
+try:
+    from google.colab import userdata
+    hf_token = userdata.get('HF_TOKEN')
+    os.environ["HF_TOKEN"] = hf_token
+    print("✅ HF_TOKEN detected and loaded from Colab Secrets!")
+except Exception:
+    print("ℹ️ HF_TOKEN not found in Colab Secrets. Falling back to interactive login...")
+    from huggingface_hub import notebook_login
+    notebook_login()</code></pre>
+
+                <h3>Code Walkthrough &amp; Parameter Breakdown:</h3>
+                <ul>
+                    <li><code>from google.colab import userdata</code>: Colab's secure key-value store. This accesses secret variables stored under the "Secrets" (key icon) sidebar of the notebook.</li>
+                    <li><code>userdata.get('HF_TOKEN')</code>: Pulls your Hugging Face API Token headlessly. Using this token avoids launching manual interactive dialogs, making the notebook completely scriptable and automating background execution.</li>
+                    <li><code>os.environ["HF_TOKEN"] = hf_token</code>: Sets the token to your process environment. Libraries like <code>transformers</code> automatically check this variable when pulling gated models like Gemma 4 from private repository hubs.</li>
+                    <li><code>from huggingface_hub import notebook_login</code>: Serves as our fallback method. It prints an interactive text input requiring manual copy-paste of your token if Colab's Secrets manager is empty.</li>
+                </ul>
+
+                <div class="callout" style="border-left-color: var(--primary); background-color: var(--primary-light); margin: 1.5rem 0;">
+                    <p style="margin-bottom: 0;"><strong>⚠️ CRITICAL HUGGING FACE TOKEN ROLE:</strong> Gemma 4 E2B is a gated model. Your Hugging Face token must have <strong>Read</strong> access to download the base model, and <strong>Write</strong> access to push fine-tuned adapters back to the Hugging Face Hub (Option 2 of Step 5.5).</p>
+                </div>
+
+                <!-- SECTION 2 -->
+                <h2>2. Loading &amp; Testing the Aligned IT Model (Baseline Comparison)</h2>
+                <p>We load the pre-trained instruction-tuned variant in 4-bit precision. This lets us benchmark the target behavior of a model that has already undergone alignment, contrasting it with raw base model autocomplete behaviors.</p>
+
+                <div class="code-header"><span>Cell 5: Loading Instruction-Tuned Model</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+it_model_id = "google/gemma-4-E2B-it"
+
+# 1. Define 4-bit Quantization (QLoRA config)
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.float16,
+    bnb_4bit_use_double_quant=True
+)
+
+# 2. Load the Model &amp; Tokenizer
+print(f"⏳ Loading instruction-tuned model '{it_model_id}' in 4-bit...")
+it_model = AutoModelForCausalLM.from_pretrained(
+    it_model_id,
+    quantization_config=bnb_config,
+    torch_dtype=torch.float16,
+    device_map="auto"
+)</code></pre>
+
+                <h3>Detailed Parameter Scrutiny:</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Parameter Name</th>
+                                <th>Default / Set Value</th>
+                                <th>Possible Values &amp; Architectural Impact</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>load_in_4bit</code></td>
+                                <td><code>True</code></td>
+                                <td>
+                                    <strong>Options:</strong> <code>True</code>, <code>False</code><br>
+                                    <strong>Impact:</strong> Toggles 4-bit quantization. Fits the 2.8B parameter model into ~1.5GB of VRAM on T4, leaving 14.5GB VRAM overhead for sequence batching.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><code>bnb_4bit_quant_type</code></td>
+                                <td><code>"nf4"</code></td>
+                                <td>
+                                    <strong>Options:</strong> <code>"nf4"</code> (NormalFloat4), <code>"fp4"</code> (standard Float4)<br>
+                                    <strong>Impact:</strong> <code>nf4</code> is a statistically optimal quantization layout for zero-centered normal distribution weights, preserving superior perplexity compared to <code>fp4</code>.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><code>bnb_4bit_compute_dtype</code></td>
+                                <td><code>torch.float16</code></td>
+                                <td>
+                                    <strong>Options:</strong> <code>torch.float16</code>, <code>torch.bfloat16</code>, <code>torch.float32</code><br>
+                                    <strong>Impact:</strong> Sets precision of matrix multiplications inside active model layers. While modern GPUs prefer <code>bfloat16</code> (which has a wider dynamic range, preventing gradient underflow), <strong>free Colab T4 GPUs do not support bfloat16 natively</strong>. Using <code>bfloat16</code> on T4 triggers silent numerical representation overflows, slowing execution or corrupting gradients.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><code>bnb_4bit_use_double_quant</code></td>
+                                <td><code>True</code></td>
+                                <td>
+                                    <strong>Options:</strong> <code>True</code>, <code>False</code><br>
+                                    <strong>Impact:</strong> Quantizes the quantization scaling constants themselves. Quantization scales are stored in FP32 format for every 64-weight block. Double Quantization compresses these FP32 constants into an 8-bit FP format, saving ~0.4GB of VRAM across Gemma 4 E2B with zero accuracy impact.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><code>torch_dtype</code></td>
+                                <td><code>torch.float16</code></td>
+                                <td>
+                                    <strong>Options:</strong> <code>torch.float16</code>, <code>torch.bfloat16</code>, <code>torch.float32</code><br>
+                                    <strong>Impact:</strong> Pre-loads model parameter weights in Float16 format from disk before sending them to bitsandbytes CUDA kernels for 4-bit NF4 compression.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><code>device_map</code></td>
+                                <td><code>"auto"</code></td>
+                                <td>
+                                    <strong>Options:</strong> <code>"auto"</code>, <code>"cuda:0"</code>, <code>None</code>, or custom dictionary maps<br>
+                                    <strong>Impact:</strong> Automates weight sharding. Splits layers sequentially across available GPUs, offloading layers to system host CPU RAM if GPU VRAM is completely saturated.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="code-header"><span>Cell 5: Unwrapping Custom Clipping Modules</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python"># Unwrap Gemma4ClippableLinear modules if present to prevent PEFT/LoRA errors
+for name, module in list(it_model.named_modules()):
+    if module.__class__.__name__ == 'Gemma4ClippableLinear':
+        parts = name.split('.')
+        parent = it_model
+        for part in parts[:-1]:
+            parent = getattr(parent, part)
+        setattr(parent, parts[-1], module.linear)</code></pre>
+                <p><strong>Under the Hood:</strong> Certain custom or private branches of Gemma 4 wrap standard PyTorch linear modules inside a custom wrapper (<code>Gemma4ClippableLinear</code>) to prevent visual gradient overflows. However, the PEFT library's target tracing functions only understand standard <code>torch.nn.Linear</code> modules. This module unwarps these custom objects back to standard base linear modules, preventing training compilation errors.</p>
+
+                <div class="code-header"><span>Cell 5: Prompt Formatting and Inference Execution</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">it_tokenizer = AutoTokenizer.from_pretrained(it_model_id)
+
+# 3. Test prompt using standard Chat Template
+messages = [
+    {"role": "user", "content": "Classify the sentiment: 'The software has a steep learning curve, but it is absolutely brilliant!'"}
+]
+
+formatted_prompt = it_tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+inputs = it_tokenizer(formatted_prompt, return_tensors="pt").to(it_model.device)
+
+with torch.no_grad():
+    outputs = it_model.generate(
+        **inputs,
+        max_new_tokens=64,
+        do_sample=False,
+        pad_token_id=it_tokenizer.eos_token_id
+    )
+
+prompt_len = inputs.input_ids.shape[1]
+generated_ids = outputs[0][prompt_len:]
+response = it_tokenizer.decode(generated_ids, skip_special_tokens=True)</code></pre>
+
+                <h3>Step-by-Step Execution Mechanics:</h3>
+                <ul>
+                    <li><code>apply_chat_template(tokenize=False, add_generation_prompt=True)</code>: Formats raw turn-taking data into Gemma's native instruction template. Selecting <code>tokenize=False</code> returns a raw string showing exactly how the model expects prompt tokens, while <code>add_generation_prompt=True</code> appends the trailing <code>&lt;start_of_turn&gt;model\n</code> token to force the model to begin writing its response.</li>
+                    <li><code>return_tensors="pt"</code>: Forces the tokenizer to output PyTorch tensors. Falling back to default would return raw Python integer lists, which PyTorch model modules cannot receive.</li>
+                    <li><code>to(it_model.device)</code>: Dynamically sends the tokenized input tensors to the specific GPU device where the quantized model resides. Mismatches trigger runtime <code>DeviceMismatchException</code> crashes.</li>
+                    <li><code>with torch.no_grad()</code>: Disables PyTorch's automatic autograd tracking. Prevents the storage of execution graphs, saving massive amounts of transient VRAM during forward passes.</li>
+                    <li><code>max_new_tokens=64</code>: Hard limit of generated tokens. Keeps model from generating text infinitely if it misses stopping tokens.</li>
+                    <li><code>do_sample=False</code>: Forces <strong>Greedy Decoding</strong>. The model selects the token with the absolute highest probability at every generation step. Essential for classification/extraction tasks because it yields completely deterministic, reproducible predictions. Setting this to <code>True</code> would enable temperature and top-p sampling, introducing random creativity.</li>
+                    <li><code>prompt_len = inputs.input_ids.shape[1]</code>: Measures prompt sequence length. Trimming the output sequence by <code>outputs[0][prompt_len:]</code> separates the prompt, returning only newly generated response tokens.</li>
+                </ul>
+
+                <!-- SECTION 3 -->
+                <h2>3. Rigorous VRAM Cleanup Protocol (Preventing training OOMs)</h2>
+                <p>Google Colab's free-tier T4 GPU offers exactly 15.01 Gigabytes of VRAM. Because loading a model allocates memory, leaving the IT model or base model playground in memory while initiating training will immediately trigger a CUDA Out of Memory (OOM) crash. This cell implements an exhaustive reference flushing pipeline.</p>
+
+                <div class="code-header"><span>Cell 6: Exhaustive Memory Reclamation</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import sys
+import gc
+import torch
+
+# 1. Clear model, tokenizer, and input references from the namespace
+for var in ['it_model', 'it_tokenizer', 'inputs', 'outputs', 'formatted_prompt', 'custom_prompt', 'response']:
+    if var in globals():
+        del globals()[var]
+
+# 2. Clear traceback references to release memory held by errors
+sys.last_traceback = None
+sys.last_value = None
+sys.last_type = None
+
+# 3. Flush IPython's command history / Out dict cache
+try:
+    ipython = get_ipython()
+    if ipython is not None:
+        ipython.user_ns.pop('_', None)
+        ipython.user_ns.pop('__', None)
+        ipython.user_ns.pop('___', None)
+        for key in list(ipython.user_ns.keys()):
+            if key.startswith('_') and key[1:].isdigit():
+                ipython.user_ns.pop(key, None)
+        if 'Out' in ipython.user_ns:
+            ipython.user_ns['Out'].clear()
+except NameError:
+    pass
+
+# 4. Trigger garbage collector &amp; empty PyTorch CUDA cache
+gc.collect()
+torch.cuda.empty_cache()</code></pre>
+
+                <h3>Behind the Scenes of Memory Deallocation:</h3>
+                <ol>
+                    <li><strong><code>del globals()[var]</code></strong>: Deletes model and input object variables from Python's global namespace, reducing their active reference counts to zero.</li>
+                    <li><strong><code>sys.last_traceback = None</code></strong>: Python automatically caches the traceback stack of previous exception failures. If a cell has crashed previously, these traceback variables hold active references to large model tensors, keeping them frozen in memory. Setting traceback states to <code>None</code> immediately breaks these silent reference loops.</li>
+                    <li><strong>IPython Namespace Flushing (<code>ipython.user_ns.pop</code>)</strong>: Jupyter Notebooks dynamically cache returned expressions inside internal history dictionary lists (e.g., <code>Out[cell_number]</code> or variables <code>_</code>, <code>__</code>, <code>___</code>). This block aggressively flushes IPython's history list, freeing hidden model weights and tensor references.</li>
+                    <li><strong><code>gc.collect()</code></strong>: Triggers Python's global cyclic garbage collector. This immediately scans memory, identifies objects with zero references, and deallocates them.</li>
+                    <li><strong><code>torch.cuda.empty_cache()</code></strong>: Python's deallocation only returns memory back to PyTorch's caching allocator, not back to the GPU driver. Emptying PyTorch's CUDA cache frees these memory blocks and returns them directly to the hardware driver, reclaiming 100% of GPU capacity.</li>
+                </ol>
+
+                <!-- SECTION 4 -->
+                <h2>4. Programmatic Synthetic Dataset Synthesis</h2>
+                <p>To fine-tune a model to become a domain sentiment specialist, we synthesize 500 diverse samples programmatically, formatted as conversational multi-turn structures.</p>
+
+                <div class="code-header"><span>Cell 10: Synthetic Dataset Synthesis Loop</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">import json
+import random
+
+# Define lexicon databases for synthesis
+domains = ["product", "movie", "app", "restaurant", "stay"]
+templates = {
+    "pos": [
+        "This {domain} is incredible and highly recommended.",
+        "Absolutely loved my stay, everything was spotless!",
+        "It works like a charm, worth every single dollar.",
+        "I don't dislike this {domain} at all, it's amazing.",
+        "This is easily the GOAT! Extremely top-tier 🔥",
+        "Although the setup was steep, it is spectacular!"
+    ],
+    "neg": [
+        "Worst {domain} I have ever spent money on.",
+        "Oh great, another bug-filled disaster... exactly what I needed.",
+        "It broke down after only three days of light usage.",
+        "Avoid at all costs. Absolute waste of time.",
+        "Cheap material, clunky interface, and sluggish support.",
+        "I really wanted to support this, but it is a complete trainwreck."
+    ]
+}
+
+synthetic_data = []
+for i in range(500):
+    sentiment = random.choice(["Positive", "Negative"])
+    tpl_group = "pos" if sentiment == "Positive" else "neg"
+    raw_review = random.choice(templates[tpl_group]).format(domain=random.choice(domains))
+    
+    # Randomize instruction wrapping
+    inst = f"Classify the sentiment: '{raw_review}'"
+    
+    synthetic_data.append({
+        "messages": [
+            {"role": "user", "content": inst},
+            {"role": "model", "content": sentiment}
+        ]
+    })
+
+# Save locally to file
+dataset_path = "sentiment_dataset.jsonl"
+with open(dataset_path, "w", encoding="utf-8") as f:
+    for sample in synthetic_data:
+        f.write(json.dumps(sample) + "\n")</code></pre>
+
+                <h3>Data Architecture and Layout:</h3>
+                <ul>
+                    <li><strong>Template Diversity:</strong> The dataset templates incorporate complex linguistic edge cases (such as double negations: <em>"I don't dislike..."</em> or mixed structures: <em>"Although the setup was steep..."</em>) to teach the model to capture context rather than simply checking for positive keywords.</li>
+                    <li><strong>Hugging Face Messages Format:</strong> Modern trainers (SFTTrainer) natively parse datasets containing a <code>"messages"</code> column. The column must be formatted as a list of dictionaries with <code>"role"</code> and <code>"content"</code> keys, mapping the conversational turns between the user and model assistant.</li>
+                    <li><strong>JSON Lines (.jsonl):</strong> Saving each conversation as a standalone JSON block on a single line prevents parse failures, allowing standard files loader backends to map records instantly.</li>
+                </ul>
+
+                <!-- SECTION 5 -->
+                <h2>5. Custom QLoRA Model Preparation &amp; Fine-Tuning Setup</h2>
+                <p>We load the raw base model <code>google/gemma-4-E2B</code>, prepare it for 4-bit quantized backpropagation, configure low-rank adapters, and define memory-efficient training arguments.</p>
+
+                <div class="code-header"><span>Cell 12: Custom Memory-Efficient QLoRA Preparation</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python"># 3. Custom memory-efficient prepare_model_for_kbit_training
+def custom_prepare_model_for_kbit_training(model, use_gradient_checkpointing=True, gradient_checkpointing_kwargs=None):
+    for name, param in model.named_parameters():
+        param.requires_grad = False
+    
+    # Only upcast tiny normalization layers (norm, ln) to float32 for stability.
+    # We skip upcasting the massive 2.8B parameter embedding &amp; language model head layers,
+    # saving ~8.75 GiB of VRAM from being allocated!
+    for name, param in model.named_parameters():
+        if ("norm" in name or "ln" in name) and param.__class__.__name__ != "Params4bit":
+            if param.dtype in [torch.float16, torch.bfloat16]:
+                param.data = param.data.to(torch.float32)
+    
+    # Explicitly convert any remaining bfloat16 parameters and buffers to float16 (essential for T4 GPU compatibility)
+    for name, param in model.named_parameters():
+        if param.dtype == torch.bfloat16:
+            param.data = param.data.to(torch.float16)
+    for name, buf in model.named_buffers():
+        if buf.dtype == torch.bfloat16:
+            buf.data = buf.data.to(torch.float16)
+    
+    if use_gradient_checkpointing:
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs=gradient_checkpointing_kwargs)
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+        else:
+            def make_inputs_require_grad(module, input, output):
+                output.requires_grad_(True)
+            model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
+    return model
+
+base_model = custom_prepare_model_for_kbit_training(base_model)</code></pre>
+
+                <h3>Deep Engineering Walkthrough: Why standard HF preparation fails</h3>
+                <p>Hugging Face's standard <code>prepare_model_for_kbit_training</code> function is designed for general models, but it introduces a severe memory bottleneck for Gemma models. Standard preparation forces both the <strong>Embedding layers</strong> and the <strong>Language Model Head (LM Head) layers</strong> to upcast to FP32 precision.</p>
+                <p>Because Gemma 4 utilizes an exceptionally large vocabulary of <strong>256,000 tokens</strong>, upcasting these two massive parameters to 32-bit floats consumes over <strong>8.75 GiB of VRAM</strong>! This allocation leaves less than 1.5GB of VRAM available for training, triggering OOMs at batch size 1.</p>
+                <p><strong>Our Custom Function Resolution:</strong></p>
+                <ol>
+                    <li>Keeps Embedding and LM Head layer weights in their compressed, quantized states, saving ~8.75 GiB of VRAM immediately.</li>
+                    <li>Upcasts only the tiny Normalization layers (containing terms like <code>"norm"</code> or <code>"ln"</code>) to standard FP32. This keeps logit computations numerically stable without wasting VRAM.</li>
+                    <li>Explicitly downcasts any raw <code>bfloat16</code> parameters or buffers directly to <code>float16</code>. T4 GPUs do not have native bfloat16 Tensor Cores. If bfloat16 data passes into active computation blocks, PyTorch is forced to run slow emulation patterns, which can trigger mixed-precision overflows and break backpropagation.</li>
+                </ol>
+
+                <div class="code-header"><span>Cell 12: PEFT LoRA Configuration</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python"># 4. Configure LoRA parameters
+lora_config = LoraConfig(
+    r=16,
+    lora_alpha=32,
+    lora_dropout=0.05,
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    bias="none",
+    task_type="CAUSAL_LM"
+)</code></pre>
+
+                <h3>LoRA Hyperparameter Breakdown &amp; Alternatives:</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>LoRA Variable</th>
+                                <th>Set Value</th>
+                                <th>Range of Options</th>
+                                <th>How to Tweak &amp; Architectural Consequences</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>r</code> (Rank)</td>
+                                <td><code>16</code></td>
+                                <td><code>4</code> to <code>64</code> (Standard power-of-2 values)</td>
+                                <td>Represents low-rank matrix dimensions. Smaller ranks (e.g. <code>r=8</code>) save memory but reduce representation capacity. Higher ranks (e.g. <code>r=64</code>) allow learning complex styles but increase model size and risk overfitting.</td>
+                            </tr>
+                            <tr>
+                                <td><code>lora_alpha</code></td>
+                                <td><code>32</code></td>
+                                <td><code>8</code> to <code>128</code></td>
+                                <td>A scaling coefficient applied to the adapter weight updates ($\Delta W \times \frac{\alpha}{r}$). Keeps adapter scaling constant relative to base weights. To prevent learning rate instability, keep the ratio of $\frac{\alpha}{r} = 2$ standard.</td>
+                            </tr>
+                            <tr>
+                                <td><code>lora_dropout</code></td>
+                                <td><code>0.05</code></td>
+                                <td><code>0.0</code> to <code>0.1</code></td>
+                                <td>Randomly drops a percentage of input signals passing into adapter modules during training. <code>0.05</code> (5%) represents the optimal sweet spot to prevent overfitting while training on synthetic datasets.</td>
+                            </tr>
+                            <tr>
+                                <td><code>target_modules</code></td>
+                                <td>All projections</td>
+                                <td><code>["q_proj", "v_proj"]</code>, or all linear modules</td>
+                                <td>Targeting only Query and Value modules saves memory but slows down training convergence. Targeting all linear projection layers (attention projections and MLP layers) maximizes representation capacity, recovering full-parameter quality.</td>
+                            </tr>
+                            <tr>
+                                <td><code>bias</code></td>
+                                <td><code>"none"</code></td>
+                                <td><code>"none"</code>, <code>"all"</code>, <code>"lora_only"</code></td>
+                                <td>Determines if linear module bias vectors are trained. Setting this to <code>"none"</code> ensures that only LoRA matrix weights are updated, keeping adapter files small and portable.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="code-header"><span>Cell 12: SFT Configuration</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python"># 5. Define SFT Training Parameters
+output_dir = "./results"
+training_args = SFTConfig(
+    output_dir=output_dir,
+    num_train_epochs=1,
+    per_device_train_batch_size=2,
+    gradient_accumulation_steps=8,
+    gradient_checkpointing=True,
+    gradient_checkpointing_kwargs={"use_reentrant": False},
+    learning_rate=2e-4,
+    optim="paged_adamw_8bit",
+    fp16=True,
+    bf16=False,
+    logging_steps=10,
+    save_strategy="no",
+    max_length=512,
+    report_to="none"
+)</code></pre>
+
+                <h3>Detailed Training Arguments Explanation:</h3>
+                <ul>
+                    <li><code>per_device_train_batch_size=2</code>: Sets the physical batch size passing into active memory. Using values $>2$ on T4 GPUs instantly triggers an activation OOM.</li>
+                    <li><code>gradient_accumulation_steps=8</code>: Accumulates loss gradients over 8 forward passes before running a single backward pass update. The effective batch size is computed as:
+                        $$\text{Effective Batch Size} = \text{Batch Size} \times \text{Accumulation Steps} \times \text{GPUs} = 2 \times 8 \times 1 = 16$$
+                        This configuration allows memory-efficient training while maintaining the convergence stability of a larger batch size.
+                    </li>
+                    <li><code>gradient_checkpointing=True</code>: Swaps compute for memory, lowering memory complexity from $O(L)$ to $O(\sqrt{L})$. Freezes activation states during forward passes and recalculates them on-the-fly during the backward pass.</li>
+                    <li><code>gradient_checkpointing_kwargs={"use_reentrant": False}</code>: Disables reentrant checkpointing. This is essential for compatibility with DDP configurations and custom PyTorch forward hooks.</li>
+                    <li><code>learning_rate=2e-4</code>: Standard learning rate starting point for LoRA adapters. Smaller values (e.g. <code>1e-5</code>) slow down convergence; higher values (e.g. <code>5e-4</code>) destabilize backpropagation.</li>
+                    <li><code>optim="paged_adamw_8bit"</code>: Compresses standard AdamW 32-bit floating-point optimizer states down to 8-bit, saving up to 75% of optimizer VRAM. The "paged" mechanism dynamically offloads transient states to host CPU RAM if GPU VRAM peaks during gradient accumulation.</li>
+                    <li><code>fp16=True</code> &amp; <code>bf16=False</code>: Uses 16-bit Float precision for T4 GPU compatibility.</li>
+                    <li><code>max_length=512</code>: Sets the maximum context length for SFTTrainer sequence packing. Longer contexts require more KV Cache memory, so keeping length capped at 512 tokens preserves VRAM.</li>
+                </ul>
+
+                <!-- SECTION 6 -->
+                <h2>6. Execution &amp; Runtime Type Alignment</h2>
+                <p>Before launching SFTTrainer training loops, we must explicitly align variables across the model module. In PyTorch training runs, any parameter marked as trainable (<code>requires_grad=True</code>) must remain in FP32 precision to prevent gradient accumulation errors, while frozen layers must be kept in standard Float16 to prevent bfloat16 activation leaks on T4.</p>
+
+                <div class="code-header"><span>Cell 12: Executing SFTTrainer Training Loop</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python"># 6. Initialize SFTTrainer
+trainer = SFTTrainer(
+    model=base_model,
+    train_dataset=dataset,
+    peft_config=lora_config,
+    processing_class=base_tokenizer,
+    args=training_args
+)
+
+# Explicitly align parameter dtypes for mixed-precision training on T4 GPU:
+for name, param in trainer.model.named_parameters():
+    if param.requires_grad:
+        if param.dtype != torch.float32:
+            param.data = param.data.to(torch.float32)
+    else:
+        if param.dtype == torch.bfloat16:
+            param.data = param.data.to(torch.float16)
+for name, buf in trainer.model.named_buffers():
+    if buf.dtype == torch.bfloat16:
+        buf.data = buf.data.to(torch.float16)
+
+# 7. Execute Fine-Tuning!
+print("⏳ Starting QLoRA fine-tuning...")
+trainer.train()
+
+# 8. Save Adapter locally
+adapter_dir = "./fine_tuned_gemma_adapter"
+trainer.model.save_pretrained(adapter_dir)
+base_tokenizer.save_pretrained(adapter_dir)</code></pre>
+
+                <h3>Detailed Line-by-Line Mechanics:</h3>
+                <ul>
+                    <li><code>trainer = SFTTrainer(...)</code>: Compiles the datasets, configurations, and models, setting up sequence packing layers and training loops.</li>
+                    <li><code>param.requires_grad</code> check: Selects active LoRA adapter modules. Upcasts adapter layers to <code>torch.float32</code> to allow PyTorch's <code>GradScaler</code> to calculate backpropagation loss precisely.</li>
+                    <li><code>param.dtype == torch.bfloat16</code> check: Finds inactive base layers. Downcasts leftover bfloat16 parameters directly to <code>torch.float16</code>. If base layers leak bfloat16 values into Float16 computations, PyTorch triggers a silent device runtime error, corrupting backpropagation states.</li>
+                    <li><code>trainer.train()</code>: Starts the training loop. This maps synthetic dataset batch steps, runs forward loops, accumulates losses, runs backward autograd passes, and updates LoRA weight values.</li>
+                    <li><code>save_pretrained()</code>: Saves your fine-tuned model adapter weights and tokenization maps to local disk storage, producing <code>adapter_config.json</code> and <code>adapter_model.safetensors</code> files.</li>
+                </ul>
+
+                <!-- SECTION 7 -->
+                <h2>7. Multi-Option Weight Storage &amp; Restoration Operations</h2>
+                <p>Google Colab runtimes are completely ephemeral: if your session times out or your browser window closes, your active VM is destroyed, erasing all local files. This section details how to store adapter weights permanently, along with reloading logic to bypass training loops in future sessions.</p>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Storage Option</th>
+                                <th>Cell Command / Snippet</th>
+                                <th>Engineering Analysis &amp; Options</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Option 1:<br>Google Drive</strong></td>
+                                <td>
+                                    <pre><code class="language-python">from google.colab import drive
+drive.mount('/content/drive')
+shutil.copytree(
+    "./fine_tuned_gemma_adapter",
+    "/content/drive/MyDrive/fine_tuned_gemma_adapter"
+)</code></pre>
+                                </td>
+                                <td>
+                                    Mounts your personal Google Drive account under Colab's local file tree. Copies the lightweight adapter folder directly into Drive storage. Free and easy, but requires manual Drive account permissions.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Option 2:<br>Hugging Face Hub</strong></td>
+                                <td>
+                                    <pre><code class="language-python">trainer.model.push_to_hub(
+    "username/gemma-4-sentiment-adapter",
+    private=True
+)</code></pre>
+                                </td>
+                                <td>
+                                    Pushes files directly into your personal Hugging Face repository account. Setting <code>private=True</code> keeps adapter safetensors hidden from public view. Ideal for collaborating across teams.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Option 3:<br>Google Cloud GCS</strong></td>
+                                <td>
+                                    <pre><code class="language-python">from google.cloud import storage
+client = storage.Client(project="YOUR_PROJECT_ID")
+bucket = client.bucket("your-gemma-gcp-bucket")
+blob = bucket.blob("adapters/adapter_model.safetensors")
+blob.upload_from_filename(
+    "./fine_tuned_gemma_adapter/adapter_model.safetensors"
+)</code></pre>
+                                </td>
+                                <td>
+                                    Uploads weights straight into Google Cloud GCS. Fits into enterprise production deployment contexts because GCS buckets can feed files directly into Serverless GCP Cloud Run serving nodes.
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Option 4:<br>Browser Download</strong></td>
+                                <td>
+                                    <pre><code class="language-python">import shutil
+from google.colab import files
+shutil.make_archive("adapter_weights", "zip", "./fine_tuned_gemma_adapter")
+files.download("adapter_weights.zip")</code></pre>
+                                </td>
+                                <td>
+                                    Zips the adapter folder and triggers an automated browser download to save weights on your local machine. Simple and standalone, but slow on sluggish browser connections.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Weight Restoration &amp; Loading Logic:</h3>
+                <p>To restore weights inside a fresh session without training again, load the lightweight adapter files directly on top of your quantized base model:</p>
+                <div class="code-header"><span>Cell 12.8: Reloading Adapter Weights</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">from peft import PeftModel
+
+# 1. Load standard base model in 4-bit first (see Step 3)
+# 2. Wrap base model in our fine-tuned PEFT adapter
+print("⏳ Restoring fine-tuned adapter weights...")
+loaded_model = PeftModel.from_pretrained(
+    base_model,
+    "./fine_tuned_gemma_adapter"
+)
+print("✅ Adapter restored successfully!")</code></pre>
+                <p><strong>Under the Hood:</strong> The <code>PeftModel.from_pretrained</code> method checks your adapter config files, hooks into the frozen base model's projection modules, and maps input forward passes through the low-rank trainable weight matrices. Re-mounting weights on top of the base model takes just seconds, completely bypassing lengthy training loops!</p>
+
+                <!-- SECTION 8 -->
+                <h2>8. Fine-Tuned Model Inference, Evaluation &amp; Specialty Alignment</h2>
+                <p>After completing the Supervised Fine-Tuning (SFT) loop, we must evaluate our newly trained QLoRA adapter. We load test reviews and prompt our hybrid model (Base Model + LoRA Adapter) to verify that it correctly classifies sentiment, behaving as a specialized classifier rather than a generic text autocomplete engine.</p>
+
+                <div class="code-header"><span>Cell 14: Executing Fine-Tuned Model Inference</span><button class="copy-code-btn" onclick="copyCode(this)">Copy</button></div>
+                <pre><code class="language-python">from peft import PeftModel
+
+# Let's run a test prompt directly on our current model state
+test_reviews = [
+    "Classify the sentiment: 'The software has a steep learning curve, but it is absolutely brilliant!'",
+    "Classify the sentiment: 'Worst service ever, completely broken.'"
+]
+
+trainer.model.eval()
+if hasattr(trainer.model, "gradient_checkpointing_disable"):
+    trainer.model.gradient_checkpointing_disable()
+trainer.model.config.use_cache = True # Enable KV Cache for generation
+
+print("\n============================================================")
+print("🚀 FINE-TUNED SPECIALIST MODEL INFERENCE RESULTS &amp; ANALYSIS")
+print("============================================================")
+
+for pr in test_reviews:
+    eval_messages = [{"role": "user", "content": pr}]
+    formatted_prompt = base_tokenizer.apply_chat_template(eval_messages, tokenize=False, add_generation_prompt=True)
+    inputs = base_tokenizer(formatted_prompt, return_tensors="pt").to(base_model.device)
+    inputs.pop("token_type_ids", None) # Remove token_type_ids if present to avoid generation dimension mismatch
+    with torch.no_grad():
+        outputs = trainer.model.generate(
+            **inputs,
+            max_new_tokens=10,
+            do_sample=False,
+            pad_token_id=base_tokenizer.eos_token_id
+        )
+        
+    prompt_len = inputs.input_ids.shape[1]
+    generated_ids = outputs[0][prompt_len:]
+    label = base_tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+    # Clean up trailing control tags if they are decoded as literal text
+    label = label.split("&lt;")[0].strip()
+    
+    print(f"Prompt entered:  '{pr}'")
+    print(f"Model Output:    '{label}'")
+    print("-"*60)</code></pre>
+
+                <h3>Deep Walkthrough of Generation-Time Variables:</h3>
+                <ul>
+                    <li><strong><code>trainer.model.eval()</code></strong>: Puts the neural network into <strong>Evaluation Mode</strong>. This disables dropout layers (like our <code>lora_dropout=0.05</code>) and batch normalization scaling. Disabling dropout is critical; leaving dropout active during inference introduces stochastic noise, leading to non-deterministic, corrupted sentiment classifications.</li>
+                    <li><strong><code>gradient_checkpointing_disable()</code></strong>: Turns off gradient checkpointing. During training, gradient checkpointing discarded forward activations to save memory, recalculating them during backpropagation. This introduces a heavy computational overhead. For inference, where we perform only a single forward pass and no backpropagation, we disable checkpointing to maximize throughput and minimize latency.</li>
+                    <li><strong><code>trainer.model.config.use_cache = True</code> (KV Cache Activation)</strong>: Re-enables the <strong>Key-Value (KV) Cache</strong>. During SFT training, the KV Cache is disabled (<code>use_cache = False</code>) because it is incompatible with gradient checkpointing. However, during generation, the model predicts text token-by-token. Without the KV Cache, the model would recompute the key and value representations of all past tokens at every step, yielding an $O(N^2)$ computational complexity. Enabling the KV Cache stores past keys and values in memory, reducing complexity to $O(N)$ and accelerating generation by up to 10x!</li>
+                    <li><strong><code>inputs.pop("token_type_ids", None)</code></strong>: Removes the token type identifier tensor. Older tokenizers (e.g., from BERT/RoBERTa) output <code>token_type_ids</code> for sequence-pair classification tasks. Modern decoder-only autoregressive models like Gemma 4 do not utilize token type IDs. If passed into the generation function, they can trigger internal tensor dimension mismatches or raise runtime warnings.</li>
+                    <li><strong><code>max_new_tokens=10</code></strong>: Constrains generation length. Since we only expect the labels <code>Positive</code> or <code>Negative</code>, 10 tokens provide a safe, generous buffer while preventing the model from entering infinite text completion loops if stopping tokens are missed.</li>
+                    <li><strong><code>label = label.split("&lt;")[0].strip()</code></strong>: Cleans up edge-case artifacts. Under certain prompt variations or custom tokenizer templates, the model might output trailing formatting strings or token markup tags (e.g. <code>&lt;end_of_turn&gt;</code>). This string split acts as an engineering safety guard, trimming any leftover control structures and returning a pristine, production-ready label.</li>
+                </ul>
+
+                <!-- SECTION 9 -->
+                <h2>9. Customizing &amp; Tweaking Your Pipeline</h2>
+                <p>This quick-reference table details how to safely modify parameters for different use cases without triggering OOM crashes:</p>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Desired Goal / Customization</th>
+                                <th>Parameter Modification</th>
+                                <th>Required Safeguards &amp; Memory Mitigations</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Train on Longer Contexts</strong> (e.g., 2048 tokens)</td>
+                                <td>Increase <code>max_length=2048</code> in <code>SFTConfig</code></td>
+                                <td>Longer contexts scale memory quadratically. To prevent VRAM crashes, lower the physical batch size to <code>per_device_train_batch_size=1</code> and increase <code>gradient_accumulation_steps=16</code> to maintain batch scale.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Increase Adapter Capacity</strong> for complex styles</td>
+                                <td>Set <code>r=32</code> and <code>lora_alpha=64</code> in <code>LoraConfig</code></td>
+                                <td>Increasing matrix rank scales the size of your adapter weights file ($\approx 30\text{MB}$ file size). Increases training parameters, so increase training iterations by setting <code>num_train_epochs=3</code> to ensure convergence.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Maximize Training Stability</strong></td>
+                                <td>Set <code>torch_dtype=torch.float32</code></td>
+                                <td>Upcasting weights to full Float32 increases VRAM usage significantly. Only attempt this on large-tier GPUs (such as NVIDIA A100 or L4 GPUs), and keep gradient checkpointing enabled.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- CHAPTER 9 QUIZ -->
+                <div class="quiz-container" style="margin-top: 3rem;">
+                    <div class="quiz-question">Knowledge Check 1: During QLoRA initialization, why do we upcast only RMSNorm/LayerNorm modules to FP32 while keeping embedding layers in 4-bit?</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Normalization layers contain very few weights and do not contribute to overfitting.')">
+                            A) Because normalization layers contain the majority of model parameters, and training them in 4-bit triggers overfitting.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Exactly! Gemma has a massive vocabulary of 256k tokens. Upcasting embedding layers to FP32 allocates over 8.75GB of VRAM, causing immediate OOMs. Upcasting RMSNorm/LayerNorm layers is computationally negligible but provides crucial numerical stability.')">
+                            B) Gemma\'s vocabulary is extremely large (256,000 tokens). Upcasting embedding layers to FP32 consumes over 8.75GB of VRAM. RMSNorm is mathematically tiny, so upcasting it costs negligible VRAM while ensuring logit stability.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'Incorrect. Embedding layers are fully compatible with QLoRA backpropagation.')">
+                            C) Because 4-bit quantization formats are physically incompatible with embedding layer operations during backpropagation.
+                        </div>
+                    </div>
+                    <div class="quiz-feedback" style="display: none;"></div>
+                </div>
+
+                <div class="quiz-container" style="margin-top: 2rem;">
+                    <div class="quiz-question">Knowledge Check 2: When training on a free-tier NVIDIA T4 GPU, why must you set bnb_4bit_compute_dtype to torch.float16 instead of torch.bfloat16?</div>
+                    <div class="quiz-options">
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. Quantization is handled in bitsandbytes, and compute dtypes are only used for active matrix multiplications.')">
+                            A) Because NormalFloat4 quantization bins are mathematically incompatible with bfloat16 representations.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'correct', 'Correct! Free Colab T4 GPUs lack native bfloat16 hardware support. Forcing bfloat16 computations requires slow software emulation that can trigger silent representation overflows, destabilizing training.')">
+                            B) Free Colab T4 GPUs lack native bfloat16 Tensor Cores, so forcing bfloat16 operations triggers slow software emulation that can leak gradients and stall backpropagation.
+                        </div>
+                        <div class="quiz-option" onclick="checkQuizAnswer(this, 'incorrect', 'No. SFTTrainer natively supports bfloat16 training on newer GPU architectures.')">
+                            C) Hugging Face\'s SFTTrainer does not support bfloat16 operations under supervised causal language modeling tasks.
+                        </div>
+                    </div>
+                    <div class="quiz-feedback" style="display: none;"></div>
+                </div>
+            </article>
